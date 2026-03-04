@@ -1,0 +1,94 @@
+package ma.swiftrent.service;
+
+import lombok.RequiredArgsConstructor;
+import ma.swiftrent.dto.AuthResponse;
+import ma.swiftrent.dto.LoginRequest;
+import ma.swiftrent.dto.RegisterRequest;
+import ma.swiftrent.entity.User;
+import ma.swiftrent.repository.UserRepository;
+import ma.swiftrent.security.JwtService;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Serwis obsługujący uwierzytelnianie i rejestrację użytkowników.
+ */
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
+
+    /**
+     * Rejestruje nowego użytkownika w systemie.
+     *
+     * @param request Dane rejestracyjne użytkownika
+     * @return Odpowiedź z tokenem JWT
+     * @throws RuntimeException gdy użytkownik o danym emailu już istnieje
+     */
+    public AuthResponse register(RegisterRequest request) {
+        // Sprawdza czy użytkownik już istnieje
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Użytkownik o podanym emailu już istnieje");
+        }
+
+        // Tworzy nowego użytkownika
+        var user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(User.Role.USER)
+                .build();
+
+        userRepository.save(user);
+
+        // Generuje token JWT z rolą
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("role", user.getRole().name());
+        var jwtToken = jwtService.generateToken(extraClaims, user);
+
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .build();
+    }
+
+    /**
+     * Loguje użytkownika do systemu.
+     *
+     * @param request Dane logowania użytkownika
+     * @return Odpowiedź z tokenem JWT
+     */
+    public AuthResponse login(LoginRequest request) {
+        // Uwierzytelnia użytkownika
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()
+                )
+        );
+
+        // Znajduje użytkownika w bazie
+        var user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
+
+        // Generuje token JWT z rolą
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("role", user.getRole().name());
+        var jwtToken = jwtService.generateToken(extraClaims, user);
+
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .build();
+    }
+}

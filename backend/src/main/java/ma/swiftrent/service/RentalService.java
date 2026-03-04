@@ -1,0 +1,249 @@
+package ma.swiftrent.service;
+
+import lombok.RequiredArgsConstructor;
+import ma.swiftrent.dto.RentalRequest;
+import ma.swiftrent.dto.RentalResponse;
+import ma.swiftrent.entity.Car;
+import ma.swiftrent.entity.Rental;
+import ma.swiftrent.entity.User;
+import ma.swiftrent.repository.CarRepository;
+import ma.swiftrent.repository.RentalRepository;
+import ma.swiftrent.repository.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Serwis obsługujący operacje na wypożyczeniach.
+ */
+@Service
+@RequiredArgsConstructor
+public class RentalService {
+
+    private final RentalRepository rentalRepository;
+    private final CarRepository carRepository;
+    private final UserRepository userRepository;
+
+    /**
+     * Tworzy nowe wypożyczenie samochodu.
+     *
+     * @param request Dane wypożyczenia
+     * @return Utworzone wypożyczenie
+     * @throws RuntimeException gdy walidacja nie powiedzie się
+     */
+    @Transactional
+    public RentalResponse createRental(RentalRequest request) {
+        // Pobiera aktualnie zalogowanego użytkownika
+        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
+
+        // Walidacja dat
+        validateDates(request.getStartDate(), request.getEndDate());
+
+        // Znajduje samochód
+        Car car = carRepository.findById(request.getCarId())
+                .orElseThrow(() -> new RuntimeException("Samochód o ID " + request.getCarId() + " nie został znaleziony"));
+
+        // Sprawdza kolizje rezerwacji
+        if (rentalRepository.existsOverlappingRental(car.getId(), request.getStartDate(), request.getEndDate())) {
+            throw new RuntimeException("Samochód jest już zarezerwowany w podanym terminie");
+        }
+
+        // Oblicza całkowity koszt
+        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+
+        // Tworzy wypożyczenie
+        Rental rental = Rental.builder()
+                .user(user)
+                .car(car)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .totalCost(totalCost)
+                .status(Rental.RentalStatus.ACTIVE)
+                .build();
+
+        // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
+        if (request.getStartDate().isEqual(LocalDate.now())) {
+            car.setStatus(Car.CarStatus.UNAVAILABLE);
+            carRepository.save(car);
+        }
+
+        Rental savedRental = rentalRepository.save(rental);
+        return RentalResponse.fromEntity(savedRental);
+    }
+
+    /**
+     * Zwraca wypożyczony samochód (zakończenie wypożyczenia).
+     *
+     * @param id ID wypożyczenia
+     */
+    @Transactional
+    public void returnRental(Long id) {
+        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        Rental rental = rentalRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
+
+        // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
+        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
+            throw new RuntimeException("Nie masz uprawnień do zwrotu tego wypożyczenia");
+        }
+
+        if (rental.getStatus() != Rental.RentalStatus.ACTIVE) {
+            throw new RuntimeException("Wypożyczenie nie jest aktywne");
+        }
+
+        // Aktualizacja daty zakończenia na dzisiejszą (jeśli zwrócono wcześniej lub później)
+        LocalDate today = LocalDate.now();
+        rental.setEndDate(today);
+        
+        // Ponowne przeliczenie kosztu na podstawie faktycznego czasu trwania
+        // Jeśli anulowano przed rozpoczęciem (dzisiaj < startDate), koszt = 0
+        BigDecimal actualCost;
+        if (today.isBefore(rental.getStartDate())) {
+            actualCost = BigDecimal.ZERO;
+        } else {
+            actualCost = calculateTotalCost(rental.getCar().getPricePerDay(), rental.getStartDate(), today);
+        }
+        rental.setTotalCost(actualCost);
+
+        rental.setStatus(Rental.RentalStatus.COMPLETED);
+        
+        // "zwolnienie" samochodu
+        Car car = rental.getCar();
+        car.setStatus(Car.CarStatus.AVAILABLE);
+        carRepository.save(car);
+        
+        rentalRepository.save(rental);
+    }
+
+    /**
+     * Anuluje rezerwację (tylko jeśli jeszcze się nie rozpoczęła).
+     *
+     * @param id ID wypożyczenia
+     */
+    @Transactional
+    public void cancelRental(Long id) {
+        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        Rental rental = rentalRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
+
+        // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
+        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
+            throw new RuntimeException("Nie masz uprawnień do anulowania tego wypożyczenia");
+        }
+
+        if (rental.getStatus() != Rental.RentalStatus.ACTIVE) {
+            throw new RuntimeException("Tylko aktywne rezerwacje można anulować");
+        }
+
+        LocalDate today = LocalDate.now();
+        
+        // Można anulować tylko rezerwacje, które jeszcze się nie rozpoczęły
+        if (!rental.getStartDate().isAfter(today)) {
+            throw new RuntimeException("Nie można anulować wypożyczenia, które już się rozpoczęło. Użyj opcji zwrotu.");
+        }
+
+        // Anulowanie - bez opłaty
+        rental.setStatus(Rental.RentalStatus.CANCELLED);
+        rental.setTotalCost(BigDecimal.ZERO);
+        rentalRepository.save(rental);
+    }
+
+    /**
+     * Pobiera wszystkie wypożyczenia zalogowanego użytkownika.
+     *
+     * @return Lista wypożyczeń użytkownika
+     */
+    @Transactional(readOnly = true)
+    public List<RentalResponse> getUserRentals() {
+        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
+
+        return rentalRepository.findByUserId(user.getId()).stream()
+                .map(RentalResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Pobiera wszystkie wypożyczenia (ADMIN).
+     *
+     * @return Lista wszystkich wypożyczeń
+     */
+    @Transactional(readOnly = true)
+    public List<RentalResponse> getAllRentals() {
+        return rentalRepository.findAll().stream()
+                .map(RentalResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Pobiera listy zajętych dat dla konkretnego samochodu.
+     */
+    @Transactional(readOnly = true)
+    public List<RentalResponse> getOccupiedDates(Long carId) {
+        return rentalRepository.findAll().stream()
+                .filter(r -> r.getCar().getId().equals(carId))
+                .filter(r -> r.getStatus() != Rental.RentalStatus.CANCELLED && r.getStatus() != Rental.RentalStatus.COMPLETED)
+                .map(RentalResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Walidacja dat wypożyczenia.
+     *
+     * @param startDate Data rozpoczęcia
+     * @param endDate Data zakończenia
+     * @throws RuntimeException gdy daty są nieprawidłowe
+     */
+    private void validateDates(LocalDate startDate, LocalDate endDate) {
+        LocalDate today = LocalDate.now();
+        LocalDate maxDate = today.plusMonths(1);
+
+        // Data rozpoczęcia nie może być w przeszłości (ale dzisiaj jest OK)
+        if (startDate.isBefore(today)) {
+            throw new RuntimeException("Data rozpoczęcia nie może być w przeszłości");
+        }
+
+        // Nie można rezerwować dalej niż na miesiąc w przód
+        if (startDate.isAfter(maxDate)) {
+            throw new RuntimeException("Można rezerwować tylko do miesiąca w przód (max: " + maxDate + ")");
+        }
+
+        // Data zakończenia musi być po dacie rozpoczęcia
+        if (endDate.isBefore(startDate) || endDate.isEqual(startDate)) {
+            throw new RuntimeException("Data zakończenia musi być po dacie rozpoczęcia");
+        }
+
+        if (endDate.isAfter(maxDate)) {
+            throw new RuntimeException("Wypożyczenie może trwać maksymalnie do " + maxDate);
+        }
+    }
+
+    /**
+     * Oblicza całkowity koszt wypożyczenia.
+     *
+     * @param pricePerDay Cena za dzień
+     * @param startDate Data rozpoczęcia
+     * @param endDate Data zakończenia
+     * @return Całkowity koszt wypożyczenia
+     */
+    private BigDecimal calculateTotalCost(BigDecimal pricePerDay, LocalDate startDate, LocalDate endDate) {
+        // Liczenie dni włącznie: z 8/01 na 9/01 = 2 dni (8/01 + 9/01)
+        long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        return pricePerDay.multiply(BigDecimal.valueOf(days));
+    }
+}
