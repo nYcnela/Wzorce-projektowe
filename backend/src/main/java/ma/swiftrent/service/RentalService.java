@@ -6,10 +6,11 @@ import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.singleton.ApplicationClock;
+import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,8 @@ public class RentalService {
     private final RentalRepository rentalRepository;
     private final CarRepository carRepository;
     private final UserRepository userRepository;
+    private final ApplicationClock applicationClock = ApplicationClock.getInstance();
+    private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
 
     /**
      * Tworzy nowe wypożyczenie samochodu.
@@ -40,7 +43,7 @@ public class RentalService {
     @Transactional
     public RentalResponse createRental(RentalRequest request) {
         // Pobiera aktualnie zalogowanego użytkownika
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userEmail = securityContextAccessor.getCurrentUserEmail();
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
@@ -66,11 +69,11 @@ public class RentalService {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .totalCost(totalCost)
-                .status(Rental.RentalStatus.ACTIVE)
+                .active()
                 .build();
 
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
-        if (request.getStartDate().isEqual(LocalDate.now())) {
+        if (request.getStartDate().isEqual(applicationClock.today())) {
             car.setStatus(Car.CarStatus.UNAVAILABLE);
             carRepository.save(car);
         }
@@ -86,13 +89,12 @@ public class RentalService {
      */
     @Transactional
     public void returnRental(Long id) {
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userEmail = securityContextAccessor.getCurrentUserEmail();
         Rental rental = rentalRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
 
         // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
-        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
 
         if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
             throw new RuntimeException("Nie masz uprawnień do zwrotu tego wypożyczenia");
@@ -103,7 +105,7 @@ public class RentalService {
         }
 
         // Aktualizacja daty zakończenia na dzisiejszą (jeśli zwrócono wcześniej lub później)
-        LocalDate today = LocalDate.now();
+        LocalDate today = applicationClock.today();
         rental.setEndDate(today);
         
         // Ponowne przeliczenie kosztu na podstawie faktycznego czasu trwania
@@ -133,13 +135,12 @@ public class RentalService {
      */
     @Transactional
     public void cancelRental(Long id) {
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userEmail = securityContextAccessor.getCurrentUserEmail();
         Rental rental = rentalRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
 
         // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
-        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
 
         if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
             throw new RuntimeException("Nie masz uprawnień do anulowania tego wypożyczenia");
@@ -149,7 +150,7 @@ public class RentalService {
             throw new RuntimeException("Tylko aktywne rezerwacje można anulować");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = applicationClock.today();
         
         // Można anulować tylko rezerwacje, które jeszcze się nie rozpoczęły
         if (!rental.getStartDate().isAfter(today)) {
@@ -169,7 +170,7 @@ public class RentalService {
      */
     @Transactional(readOnly = true)
     public List<RentalResponse> getUserRentals() {
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        String userEmail = securityContextAccessor.getCurrentUserEmail();
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
@@ -210,7 +211,7 @@ public class RentalService {
      * @throws RuntimeException gdy daty są nieprawidłowe
      */
     private void validateDates(LocalDate startDate, LocalDate endDate) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = applicationClock.today();
         LocalDate maxDate = today.plusMonths(1);
 
         // Data rozpoczęcia nie może być w przeszłości (ale dzisiaj jest OK)

@@ -2,13 +2,13 @@ package ma.swiftrent.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -19,7 +19,6 @@ import java.util.List;
 @Entity
 @Table(name = "users")
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class User implements UserDetails {
@@ -69,4 +68,75 @@ public class User implements UserDetails {
         USER,
         ADMIN
     }
+
+    // Tydzień 2, Wzorzec Builder 2
+    // Użytkownik ma pola obowiązkowe, domyślną rolę i kolekcje relacji.
+    // Ręczny builder zastępuje builder Lomboka i pilnuje spójnego stanu nowego obiektu.
+    public static UserBuilder builder() {
+        return new UserBuilder();
+    }
+
+    public static final class UserBuilder {
+        private Long id;
+        private String email;
+        private String password;
+        private Role role = Role.USER;
+        private List<Rental> rentals = new ArrayList<>();
+        private List<Car> favorites = new ArrayList<>();
+
+        private UserBuilder() {
+        }
+
+        public UserBuilder id(Long id) {
+            this.id = id;
+            return this;
+        }
+
+        public UserBuilder email(String email) {
+            this.email = email;
+            return this;
+        }
+
+        public UserBuilder password(String password) {
+            this.password = password;
+            return this;
+        }
+
+        public UserBuilder role(Role role) {
+            this.role = role;
+            return this;
+        }
+
+        public UserBuilder userRole() {
+            this.role = Role.USER;
+            return this;
+        }
+
+        public UserBuilder adminRole() {
+            this.role = Role.ADMIN;
+            return this;
+        }
+
+        public UserBuilder rentals(List<Rental> rentals) {
+            this.rentals = rentals;
+            return this;
+        }
+
+        public UserBuilder favorites(List<Car> favorites) {
+            this.favorites = favorites;
+            return this;
+        }
+
+        public User build() {
+            User user = new User();
+            user.setId(id);
+            user.setEmail(email);
+            user.setPassword(password);
+            user.setRole(role);
+            user.setRentals(rentals);
+            user.setFavorites(favorites);
+            return user;
+        }
+    }
+    // Koniec, Tydzień 2, Wzorzec Builder 2
 }

@@ -2,11 +2,11 @@ package ma.swiftrent.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -15,7 +15,6 @@ import java.util.List;
 @Entity
 @Table(name = "cars")
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Car {
@@ -54,4 +53,96 @@ public class Car {
         AVAILABLE,
         UNAVAILABLE
     }
+
+    // Tydzień 2, Wzorzec Builder 1
+    // Samochód ma kilka pól opcjonalnych i wiele miejsc tworzenia w aplikacji.
+    // Ręczny builder zastępuje builder Lomboka i pozwala budować obiekt krok po kroku.
+    public static CarBuilder builder() {
+        return new CarBuilder();
+    }
+
+    public static final class CarBuilder {
+        private Long id;
+        private String brand;
+        private String model;
+        private BigDecimal pricePerDay;
+        private Integer productionYear;
+        private String color;
+        private String imageUrl;
+        private CarStatus status = CarStatus.AVAILABLE;
+        private List<Rental> rentals = new ArrayList<>();
+
+        private CarBuilder() {
+        }
+
+        public CarBuilder id(Long id) {
+            this.id = id;
+            return this;
+        }
+
+        public CarBuilder brand(String brand) {
+            this.brand = brand;
+            return this;
+        }
+
+        public CarBuilder model(String model) {
+            this.model = model;
+            return this;
+        }
+
+        public CarBuilder pricePerDay(BigDecimal pricePerDay) {
+            this.pricePerDay = pricePerDay;
+            return this;
+        }
+
+        public CarBuilder productionYear(Integer productionYear) {
+            this.productionYear = productionYear;
+            return this;
+        }
+
+        public CarBuilder color(String color) {
+            this.color = color;
+            return this;
+        }
+
+        public CarBuilder imageUrl(String imageUrl) {
+            this.imageUrl = imageUrl;
+            return this;
+        }
+
+        public CarBuilder status(CarStatus status) {
+            this.status = status;
+            return this;
+        }
+
+        public CarBuilder available() {
+            this.status = CarStatus.AVAILABLE;
+            return this;
+        }
+
+        public CarBuilder unavailable() {
+            this.status = CarStatus.UNAVAILABLE;
+            return this;
+        }
+
+        public CarBuilder rentals(List<Rental> rentals) {
+            this.rentals = rentals;
+            return this;
+        }
+
+        public Car build() {
+            Car car = new Car();
+            car.setId(id);
+            car.setBrand(brand);
+            car.setModel(model);
+            car.setPricePerDay(pricePerDay);
+            car.setProductionYear(productionYear);
+            car.setColor(color);
+            car.setImageUrl(imageUrl);
+            car.setStatus(status);
+            car.setRentals(rentals);
+            return car;
+        }
+    }
+    // Koniec, Tydzień 2, Wzorzec Builder 1
 }

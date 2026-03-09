@@ -4,22 +4,20 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
+import ma.swiftrent.pattern.singleton.UploadStorageSettings;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
-import java.io.InputStream;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.UUID;
-
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -31,15 +29,7 @@ public class CarService {
 
     private final CarRepository carRepository;
     private final RentalRepository rentalRepository;
-    private final Path fileStorageLocation = Paths.get("uploads").toAbsolutePath().normalize();
-
-    {
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception ex) {
-            throw new RuntimeException("Nie można utworzyć katalogu na pliki.", ex);
-        }
-    }
+    private final UploadStorageSettings uploadStorageSettings = UploadStorageSettings.getInstance();
 
     private CarResponse mapToResponse(Car car) {
         CarResponse response = CarResponse.fromEntity(car);
@@ -70,9 +60,9 @@ public class CarService {
             //Generuje unikalna nazwe pliku
             String newFileName = UUID.randomUUID().toString() + "_" + fileName;
             //Zapisuje plik na dysku
-            Path targetLocation = this.fileStorageLocation.resolve(newFileName);
+            Path targetLocation = uploadStorageSettings.resolveTargetLocation(newFileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            return "http://localhost:8080/uploads/" + newFileName;
+            return uploadStorageSettings.buildPublicUrl(newFileName);
         } catch (IOException ex) {
             throw new RuntimeException("Nie mozna zapisac" + fileName + ". Sprobuj ponownie", ex);
         }
@@ -135,7 +125,7 @@ public class CarService {
                 .productionYear(request.getProductionYear())
                 .color(request.getColor())
                 .imageUrl(imageUrl)
-                .status(Car.CarStatus.AVAILABLE)
+                .available()
                 .build();
 
         Car savedCar = carRepository.save(car);

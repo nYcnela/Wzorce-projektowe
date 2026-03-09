@@ -45,13 +45,13 @@ public class DataLoader implements CommandLineRunner {
         User admin = User.builder()
                 .email("admin@swiftrent.pl")
                 .password(passwordEncoder.encode("admin"))
-                .role(User.Role.ADMIN)
+                .adminRole()
                 .build();
 
         User user = User.builder()
                 .email("user@swiftrent.pl")
                 .password(passwordEncoder.encode("user"))
-                .role(User.Role.USER)
+                .userRole()
                 .build();
 
         userRepository.saveAll(Arrays.asList(admin, user));
@@ -78,7 +78,7 @@ public class DataLoader implements CommandLineRunner {
                         .productionYear(2020)
                         .color("biały")
                         .imageUrl("https://images.unsplash.com/photo-1623869675781-80aa31012a5a?w=400")
-                        .status(Car.CarStatus.AVAILABLE)
+                        .available()
                         .build(),
 
                 Car.builder()
@@ -88,7 +88,7 @@ public class DataLoader implements CommandLineRunner {
                         .productionYear(2025)
                         .color("ciemno zielony")
                         .imageUrl("http://localhost:8080/uploads/bmwx5.png")
-                        .status(Car.CarStatus.AVAILABLE)
+                        .available()
                         .build(),
 
                 Car.builder()
@@ -98,7 +98,7 @@ public class DataLoader implements CommandLineRunner {
                         .productionYear(2024)
                         .color("niebieski")
                         .imageUrl("http://localhost:8080/uploads/cklasa.png")
-                        .status(Car.CarStatus.AVAILABLE)
+                        .available()
                         .build(),
 
                 Car.builder()
@@ -108,7 +108,7 @@ public class DataLoader implements CommandLineRunner {
                         .productionYear(2022)
                         .color("srebrny")
                         .imageUrl("http://localhost:8080/uploads/audia4.png")
-                        .status(Car.CarStatus.AVAILABLE)
+                        .available()
                         .build(),
 
                 Car.builder()
@@ -118,7 +118,7 @@ public class DataLoader implements CommandLineRunner {
                         .productionYear(1998)
                         .color("srebrny")
                         .imageUrl("http://localhost:8080/uploads/golf.png")
-                        .status(Car.CarStatus.AVAILABLE)
+                        .available()
                         .build()
         );
 
