@@ -81,6 +81,16 @@ export default function HomePage() {
     }
   };
 
+  const handleDuplicate = async (id: number) => {
+        try {
+            await apiClient.post(`/cars/${id}/duplicate`);
+            toast.success("Samochód został skopiowany");
+            fetchCars();
+        } catch (error) {
+            toast.error("Nie udało się skopiować samochodu");
+        }
+  };
+
   const handleEdit = (car: Car) => {
     setCarToEdit(car);
     setIsEditCarModalOpen(true);
@@ -211,6 +221,7 @@ export default function HomePage() {
                 onRent={handleRent}
                 onDelete={isAdmin ? handleDelete : undefined}
                 onEdit={isAdmin ? handleEdit : undefined}
+                onDuplicate={isAdmin ? handleDuplicate : undefined}
               />
             ))}
           </div>

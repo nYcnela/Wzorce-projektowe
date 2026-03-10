@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ma.swiftrent.pattern.prototype.Prototype;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,7 +22,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User implements UserDetails {
+public class User implements UserDetails, Prototype<User> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -60,6 +61,27 @@ public class User implements UserDetails {
     public String getUsername() {
         return email;
     }
+
+    /*
+        Tydzień 2, Wzorzec Prototype 2
+        Tworzy nowy obiekt klasy User poprzez
+        kopiowanie istniejacej już instancji
+        za pomocą konstruktora kopiujacego
+    */
+    public User(User source){
+        this.email = source.email;
+        this.password = source.password;
+        this.role = source.role;
+        this.rentals = source.rentals;
+        this.favorites = source.favorites;
+    }
+
+    @Override
+    public User clone() {
+        User copy = new User(this);
+        return copy;
+    }
+    //Koniec, Tydzień 2, Wzorzec Prototype 2
 
     /**
      * Enum reprezentujący role użytkowników w systemie.
