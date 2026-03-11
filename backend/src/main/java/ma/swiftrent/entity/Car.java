@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ma.swiftrent.pattern.prototype.Prototype;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -17,7 +18,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Car {
+public class Car implements Prototype<Car> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -145,4 +146,27 @@ public class Car {
         }
     }
     // Koniec, Tydzień 2, Wzorzec Builder 1
+
+    /*
+        Tydzień 2, Wzorzec Prototype 1
+        Tworzy nowy obiekt klasy Car poprzez
+        kopiowanie istniejacej już instancji
+        za pomocą konstruktora kopiującego
+    */
+    public Car(Car source) {
+        this.brand = source.brand;
+        this.model = source.model;
+        this.pricePerDay = source.pricePerDay;
+        this.productionYear = source.productionYear;
+        this.color = source.color;
+        this.imageUrl = source.imageUrl;
+        this.status = source.status;
+        this.rentals = new ArrayList<>();
+    }
+
+    @Override
+    public Car clone() {
+        return new Car(this);
+    }
+    //Koniec, Tydzień 2, Wzorzec Prototype 1
 }

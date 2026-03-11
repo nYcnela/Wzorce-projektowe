@@ -10,6 +10,7 @@ import {
   Heart,
   Pencil,
   Trash2,
+  Copy
 } from "lucide-react";
 
 interface CarCardProps {
@@ -19,6 +20,7 @@ interface CarCardProps {
   onDelete?: (id: number) => void;
   onEdit?: (car: Car) => void;
   onToggleFavorite?: (id: number) => void;
+  onDuplicate?: (id: number) => void;
 }
 
 export default function CarCard({
@@ -28,6 +30,7 @@ export default function CarCard({
   onDelete,
   onEdit,
   onToggleFavorite,
+  onDuplicate
 }: CarCardProps) {
   const { isAdmin, isAuthenticated } = useAuth();
 
@@ -105,6 +108,15 @@ export default function CarCard({
 
         {isAdmin && (
           <>
+            {onDuplicate && (
+                  <Button
+                      variant="outline"
+                      className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      onClick={() => onDuplicate(car.id)}
+                  >
+                      <Copy size={16} />
+                  </Button>
+            )}
             {onEdit && (
               <Button
                 variant="outline"

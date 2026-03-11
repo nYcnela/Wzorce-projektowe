@@ -167,4 +167,21 @@ public class CarService {
         }
         carRepository.deleteById(id);
     }
+
+    /**
+     * Duplikuje samochód wykorzystując do tego wzorzec prototypu
+     */
+    @Transactional
+    public CarResponse duplicateCar(Long id) {
+
+        Car original = carRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Samochód o ID " + id + " nie istnieje"));
+
+        Car copy = original.clone();
+        copy.setId(null);
+
+        Car saved = carRepository.save(copy);
+
+        return mapToResponse(saved);
+    }
 }

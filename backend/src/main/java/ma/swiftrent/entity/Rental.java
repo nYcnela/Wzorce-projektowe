@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ma.swiftrent.pattern.prototype.Prototype;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,7 +17,7 @@ import java.time.LocalDate;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Rental {
+public class Rental implements Prototype<Rental> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,6 +43,27 @@ public class Rental {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RentalStatus status;
+
+    /*
+        Tydzień 2, Wzorzec Prototype 3
+        Tworzy nowy obiekt klasy Rental poprzez
+        kopiowanie istniejacej już instancji
+        za pomocą konstruktora kopiującego
+    */
+    public Rental(Rental source){
+        this.user = source.user;
+        this.car = source.car;
+        this.startDate = source.startDate;
+        this.endDate = source.endDate;
+        this.totalCost = source.totalCost;
+        this.status = source.status;
+    }
+
+    @Override
+    public Rental clone() {
+        return new Rental(this);
+    }
+    //Koniec, Tydzień 2, Wzorzec Prototype 3
 
     /**
      * Status wypożyczenia.

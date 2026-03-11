@@ -94,4 +94,15 @@ public class CarController {
         carService.deleteCar(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Endpoint do duplikowania samochodów (tylko dla ADMIN)
+     * @param id ID samochodu do zduplikowania
+     * @return Odpowiedź z id duplikatu
+     */
+    @PostMapping("/{id}/duplicate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CarResponse> duplicateCar(@PathVariable Long id) {
+        return ResponseEntity.ok(carService.duplicateCar(id));
+    }
 }
