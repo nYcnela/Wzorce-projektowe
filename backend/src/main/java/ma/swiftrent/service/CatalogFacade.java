@@ -17,20 +17,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CatalogFacade {
 
-    private final CarService carService;
+    private final CarOperationsService carOperationsService;
     private final RentalService rentalService;
     private final UserService userService;
 
     public List<CarResponse> getPublicCatalog(String sortBy) {
-        return carService.getAllCars(sortBy);
+        return carOperationsService.getAllCars(sortBy);
     }
 
     public CarResponse getCarDetails(Long carId) {
-        return carService.getCarById(carId);
+        return carOperationsService.getCarById(carId);
     }
 
     public CatalogViewResponse getUserCatalog(String userEmail, String sortBy) {
-        List<CarResponse> cars = carService.getAllCars(sortBy);
+        List<CarResponse> cars = carOperationsService.getAllCars(sortBy);
         List<CarResponse> favoriteCars = userService.getUserFavorites(userEmail);
 
         return CatalogViewResponse.builder()
@@ -42,7 +42,7 @@ public class CatalogFacade {
     }
 
     public CatalogViewResponse getPublicCatalogView(String sortBy) {
-        List<CarResponse> cars = carService.getAllCars(sortBy);
+        List<CarResponse> cars = carOperationsService.getAllCars(sortBy);
 
         return CatalogViewResponse.builder()
                 .cars(cars)
@@ -53,7 +53,7 @@ public class CatalogFacade {
     }
 
     public CarAvailabilityResponse getCarAvailability(Long carId) {
-        CarResponse car = carService.getCarById(carId);
+        CarResponse car = carOperationsService.getCarById(carId);
         List<RentalResponse> occupiedDates = rentalService.getOccupiedDates(carId);
 
         return CarAvailabilityResponse.builder()

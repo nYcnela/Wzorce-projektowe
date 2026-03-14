@@ -4,32 +4,26 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
-import ma.swiftrent.pattern.singleton.UploadStorageSettings;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
+import ma.swiftrent.service.storage.FileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Serwis obsługujący operacje na samochodach.
  */
-@Service
+@Service("carOperationsServiceTarget")
 @RequiredArgsConstructor
-public class CarService {
+public class CarService implements CarOperationsService {
 
     private final CarRepository carRepository;
     private final RentalRepository rentalRepository;
-    private final UploadStorageSettings uploadStorageSettings = UploadStorageSettings.getInstance();
+    private final FileStorageService fileStorageService;
 
     private CarResponse mapToResponse(Car car) {
         CarResponse response = CarResponse.fromEntity(car);
@@ -43,38 +37,13 @@ public class CarService {
     }
 
     /**
-     * Zapisuje plik na dysku i zwraca jego URL.
-     */
-    public String storeFile(MultipartFile file) {
-        //sprawdzanie czy cos zostalo przeslane
-        if (file == null || file.isEmpty()) {
-            return null;
-        }
-
-        //Pobiera oryginalna nazwe pliku
-        String fileName = StringUtils.cleanPath(file.getOriginalFilename());
-        try {
-            if(fileName.contains("..")) {
-                throw new RuntimeException("Nazwa pliku zawiera niepoprawna sekwencje " + fileName);
-            }
-            //Generuje unikalna nazwe pliku
-            String newFileName = UUID.randomUUID().toString() + "_" + fileName;
-            //Zapisuje plik na dysku
-            Path targetLocation = uploadStorageSettings.resolveTargetLocation(newFileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            return uploadStorageSettings.buildPublicUrl(newFileName);
-        } catch (IOException ex) {
-            throw new RuntimeException("Nie mozna zapisac" + fileName + ". Sprobuj ponownie", ex);
-        }
-    }
-
-    /**
      * Pobiera wszystkie samochody z bazy danych.
      * 
      * @param sortBy Opcjonalny parametr sortowania: price-asc, price-desc
      * @return Lista samochodów posortowana według wybranego kryterium
      */
     @Transactional(readOnly = true)
+    @Override
     public List<CarResponse> getAllCars(String sortBy) {
         //Pobiera wszystkie samochody i mapuje na dto
         List<CarResponse> cars = carRepository.findAll().stream()
@@ -102,6 +71,7 @@ public class CarService {
      * Pobiera samochód po ID.
      */
     @Transactional(readOnly = true)
+    @Override
     public CarResponse getCarById(Long id) {
         Car car = carRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Samochód o ID " + id + " nie został znaleziony"));
@@ -112,8 +82,9 @@ public class CarService {
      * Tworzy nowy samochód (ADMIN).
      */
     @Transactional
+    @Override
     public CarResponse createCar(CarRequest request, MultipartFile image) {
-        String imageUrl = storeFile(image);
+        String imageUrl = fileStorageService.store(image);
         if (imageUrl == null) {
             imageUrl = request.getImageUrl();
         }
@@ -136,11 +107,12 @@ public class CarService {
      * Aktualizuje dane samochodu (ADMIN).
      */
     @Transactional
+    @Override
     public CarResponse updateCar(Long id, CarRequest request, MultipartFile image) {
         Car car = carRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Samochód o ID " + id + " nie został znaleziony"));
 
-        String imageUrl = storeFile(image);
+        String imageUrl = fileStorageService.store(image);
         if (imageUrl != null) {
             car.setImageUrl(imageUrl);
         } else if (request.getImageUrl() != null) {
@@ -161,6 +133,7 @@ public class CarService {
      * Usuwa samochód z bazy danych (ADMIN).
      */
     @Transactional
+    @Override
     public void deleteCar(Long id) {
         if (!carRepository.existsById(id)) {
             throw new RuntimeException("Samochód o ID " + id + " nie został znaleziony");
@@ -172,6 +145,7 @@ public class CarService {
      * Duplikuje samochód wykorzystując do tego wzorzec prototypu
      */
     @Transactional
+    @Override
     public CarResponse duplicateCar(Long id) {
 
         Car original = carRepository.findById(id)

@@ -24,7 +24,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
+    private final TokenService tokenService;
     private final UserDetailsService userDetailsService;
 
     @Override
@@ -45,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Wyciąga token z nagłówka (pomijając "Bearer ")
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
+        userEmail = tokenService.extractUsername(jwt);
 
         // Jeśli email został wydobyty i użytkownik nie jest jeszcze uwierzytelniony
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -53,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
             // Sprawdza czy token jest ważny
-            if (jwtService.isTokenValid(jwt, userDetails)) {
+            if (tokenService.isTokenValid(jwt, userDetails)) {
                 // Tworzy obiekt uwierzytelnienia
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,

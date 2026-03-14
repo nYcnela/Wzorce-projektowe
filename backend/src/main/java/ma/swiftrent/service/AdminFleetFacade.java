@@ -16,10 +16,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminFleetFacade {
 
-    private final CarService carService;
+    private final CarOperationsService carOperationsService;
 
     public AdminFleetOverviewResponse getFleetOverview(String sortBy) {
-        List<CarResponse> cars = carService.getAllCars(sortBy);
+        List<CarResponse> cars = carOperationsService.getAllCars(sortBy);
         long availableCars = cars.stream()
                 .filter(CarResponse::isAvailable)
                 .count();
@@ -33,19 +33,19 @@ public class AdminFleetFacade {
     }
 
     public CarResponse createCar(CarRequest request, MultipartFile image) {
-        return carService.createCar(request, image);
+        return carOperationsService.createCar(request, image);
     }
 
     public CarResponse updateCar(Long id, CarRequest request, MultipartFile image) {
-        return carService.updateCar(id, request, image);
+        return carOperationsService.updateCar(id, request, image);
     }
 
     public void deleteCar(Long id) {
-        carService.deleteCar(id);
+        carOperationsService.deleteCar(id);
     }
 
     public CarResponse duplicateCar(Long id) {
-        return carService.duplicateCar(id);
+        return carOperationsService.duplicateCar(id);
     }
 }
 // Koniec, Tydzień 4, Wzorzec Facade 1

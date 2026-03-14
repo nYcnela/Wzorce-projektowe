@@ -6,7 +6,7 @@ import ma.swiftrent.dto.LoginRequest;
 import ma.swiftrent.dto.RegisterRequest;
 import ma.swiftrent.entity.User;
 import ma.swiftrent.repository.UserRepository;
-import ma.swiftrent.security.JwtService;
+import ma.swiftrent.security.TokenService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,7 +24,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final TokenService tokenService;
     private final AuthenticationManager authenticationManager;
 
     /**
@@ -52,7 +52,7 @@ public class AuthService {
         // Generuje token JWT z rolą
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("role", user.getRole().name());
-        var jwtToken = jwtService.generateToken(extraClaims, user);
+        var jwtToken = tokenService.generateToken(extraClaims, user);
 
         return AuthResponse.builder()
                 .token(jwtToken)
@@ -83,7 +83,7 @@ public class AuthService {
         // Generuje token JWT z rolą
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("role", user.getRole().name());
-        var jwtToken = jwtService.generateToken(extraClaims, user);
+        var jwtToken = tokenService.generateToken(extraClaims, user);
 
         return AuthResponse.builder()
                 .token(jwtToken)
