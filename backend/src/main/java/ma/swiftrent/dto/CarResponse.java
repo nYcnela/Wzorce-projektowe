@@ -33,16 +33,7 @@ public class CarResponse {
      * Konwertuje encję Car na CarResponse.
      */
     public static CarResponse fromEntity(Car car) {
-        return CarResponse.builder()
-                .id(car.getId())
-                .brand(car.getBrand())
-                .model(car.getModel())
-                .pricePerDay(car.getPricePerDay())
-                .productionYear(car.getProductionYear())
-                .color(car.getColor())
-                .imageUrl(car.getImageUrl())
-                .status(car.getStatus().name())
-                .available(car.getStatus() == Car.CarStatus.AVAILABLE)
-                .build();
+        return CarCatalogProfileFactory.forCar(car)
+                .toResponse(car.getId(), car.getPricePerDay(), car.getStatus());
     }
 }

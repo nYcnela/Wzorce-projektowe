@@ -1,5 +1,7 @@
 package ma.swiftrent.exception;
 
+import ma.swiftrent.exception.flyweight.ErrorTemplateFactory;
+import ma.swiftrent.exception.flyweight.ErrorTemplateFlyweight;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -34,16 +36,7 @@ public class GlobalExceptionHandler {
             System.out.println("Pole: " + fieldName + " - " + errorMessage);
             errors.put(fieldName, errorMessage);
         });
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("Błąd walidacji")
-                .message("Dane wejściowe są nieprawidłowe")
-                .validationErrors(errors)
-                .build();
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        return buildResponse(ErrorTemplateFactory.validation(), null, errors);
     }
 
     /**
@@ -51,14 +44,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Nieprawidłowe dane logowania")
-                .message("Email lub hasło jest nieprawidłowe")
-                .build();
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        return buildResponse(ErrorTemplateFactory.badCredentials(), null, null);
     }
 
     /**
@@ -66,14 +52,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UsernameNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleUserNotFound(UsernameNotFoundException ex) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error("Użytkownik nie został znaleziony")
-                .message(ex.getMessage())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        return buildResponse(ErrorTemplateFactory.userNotFound(), ex.getMessage(), null);
     }
 
     /**
@@ -81,14 +60,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("Błąd operacji")
-                .message(ex.getMessage())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        return buildResponse(ErrorTemplateFactory.runtimeError(), ex.getMessage(), null);
     }
 
     /**
@@ -98,14 +70,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         System.out.println("Błąd: " + ex.getMessage());
         ex.printStackTrace();
+        return buildResponse(ErrorTemplateFactory.internalError(), "Szczegoly bledu: " + ex.getMessage(), null);
+    }
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("Wewnętrzny błąd serwera")
-                .message("Szczegoly bledu: " + ex.getMessage())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    private ResponseEntity<ErrorResponse> buildResponse(
+            ErrorTemplateFlyweight template,
+            String message,
+            Map<String, String> validationErrors
+    ) {
+        ErrorResponse errorResponse = template.toResponse(LocalDateTime.now(), message, validationErrors);
+        return ResponseEntity.status(template.getStatus()).body(errorResponse);
     }
 }
