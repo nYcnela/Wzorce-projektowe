@@ -2,15 +2,18 @@ package ma.swiftrent.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.dto.AdminFleetOverviewResponse;
+import ma.swiftrent.dto.CarAvailabilityResponse;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
-import ma.swiftrent.service.CarService;
+import ma.swiftrent.service.AdminFleetFacade;
+import ma.swiftrent.service.CatalogFacade;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.MediaType;
 
 import java.util.List;
 
@@ -22,7 +25,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CarController {
 
-    private final CarService carService;
+    private final CatalogFacade catalogFacade;
+    private final AdminFleetFacade adminFleetFacade;
 
     /**
      * Endpoint pobierający wszystkie samochody (dostępny publicznie).
@@ -34,7 +38,7 @@ public class CarController {
     public ResponseEntity<List<CarResponse>> getAllCars(
             @RequestParam(required = false) String sortBy
     ) {
-        return ResponseEntity.ok(carService.getAllCars(sortBy));
+        return ResponseEntity.ok(catalogFacade.getPublicCatalog(sortBy));
     }
 
     /**
@@ -45,7 +49,18 @@ public class CarController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<CarResponse> getCarById(@PathVariable Long id) {
-        return ResponseEntity.ok(carService.getCarById(id));
+        return ResponseEntity.ok(catalogFacade.getCarDetails(id));
+    }
+
+    /**
+     * Endpoint pobierający dostępność samochodu wraz z zajętymi terminami.
+     *
+     * @param id ID samochodu
+     * @return Szczegóły samochodu i lista zajętych terminów
+     */
+    @GetMapping("/{id}/availability")
+    public ResponseEntity<CarAvailabilityResponse> getCarAvailability(@PathVariable Long id) {
+        return ResponseEntity.ok(catalogFacade.getCarAvailability(id));
     }
 
     /**
@@ -61,7 +76,7 @@ public class CarController {
             @RequestPart("car") @Valid CarRequest request,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(carService.createCar(request, image));
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminFleetFacade.createCar(request, image));
     }
 
     /**
@@ -79,7 +94,7 @@ public class CarController {
             @RequestPart("car") @Valid CarRequest request,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
-        return ResponseEntity.ok(carService.updateCar(id, request, image));
+        return ResponseEntity.ok(adminFleetFacade.updateCar(id, request, image));
     }
 
     /**
@@ -91,7 +106,7 @@ public class CarController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteCar(@PathVariable Long id) {
-        carService.deleteCar(id);
+        adminFleetFacade.deleteCar(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -103,6 +118,20 @@ public class CarController {
     @PostMapping("/{id}/duplicate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CarResponse> duplicateCar(@PathVariable Long id) {
-        return ResponseEntity.ok(carService.duplicateCar(id));
+        return ResponseEntity.ok(adminFleetFacade.duplicateCar(id));
+    }
+
+    /**
+     * Endpoint pobierający podsumowanie floty dla administratora.
+     *
+     * @param sortBy Opcjonalny parametr sortowania
+     * @return Zbiorczy widok floty
+     */
+    @GetMapping("/admin/overview")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminFleetOverviewResponse> getAdminFleetOverview(
+            @RequestParam(required = false) String sortBy
+    ) {
+        return ResponseEntity.ok(adminFleetFacade.getFleetOverview(sortBy));
     }
 }

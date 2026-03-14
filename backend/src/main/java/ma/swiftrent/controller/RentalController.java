@@ -4,7 +4,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
-import ma.swiftrent.service.RentalService;
+import ma.swiftrent.dto.RentalWorkflowOverviewResponse;
+import ma.swiftrent.service.RentalWorkflowFacade;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RentalController {
 
-    private final RentalService rentalService;
+    private final RentalWorkflowFacade rentalWorkflowFacade;
 
     /**
      * Endpoint tworzący nowe wypożyczenie (dostępny dla zalogowanych użytkowników).
@@ -30,7 +31,7 @@ public class RentalController {
      */
     @PostMapping
     public ResponseEntity<RentalResponse> createRental(@Valid @RequestBody RentalRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(rentalService.createRental(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(rentalWorkflowFacade.createRental(request));
     }
 
     /**
@@ -40,7 +41,7 @@ public class RentalController {
      */
     @PostMapping("/{id}/return")
     public ResponseEntity<Void> returnRental(@PathVariable Long id) {
-        rentalService.returnRental(id);
+        rentalWorkflowFacade.returnRental(id);
         return ResponseEntity.ok().build();
     }
 
@@ -51,7 +52,7 @@ public class RentalController {
      */
     @PostMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelRental(@PathVariable Long id) {
-        rentalService.cancelRental(id);
+        rentalWorkflowFacade.cancelRental(id);
         return ResponseEntity.ok().build();
     }
 
@@ -62,7 +63,7 @@ public class RentalController {
      */
     @GetMapping("/my-rentals")
     public ResponseEntity<List<RentalResponse>> getUserRentals() {
-        return ResponseEntity.ok(rentalService.getUserRentals());
+        return ResponseEntity.ok(rentalWorkflowFacade.getUserRentals());
     }
 
     /**
@@ -73,7 +74,7 @@ public class RentalController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<RentalResponse>> getAllRentals() {
-        return ResponseEntity.ok(rentalService.getAllRentals());
+        return ResponseEntity.ok(rentalWorkflowFacade.getAllRentals());
     }
 
     /**
@@ -81,6 +82,14 @@ public class RentalController {
      */
     @GetMapping("/car/{carId}/occupied")
     public ResponseEntity<List<RentalResponse>> getOccupiedDates(@PathVariable Long carId) {
-        return ResponseEntity.ok(rentalService.getOccupiedDates(carId));
+        return ResponseEntity.ok(rentalWorkflowFacade.getOccupiedDates(carId));
+    }
+
+    /**
+     * Endpoint pobierający zbiorczy widok procesu wypożyczeń dla wybranego samochodu.
+     */
+    @GetMapping("/overview/car/{carId}")
+    public ResponseEntity<RentalWorkflowOverviewResponse> getWorkflowOverview(@PathVariable Long carId) {
+        return ResponseEntity.ok(rentalWorkflowFacade.getWorkflowOverview(carId));
     }
 }
