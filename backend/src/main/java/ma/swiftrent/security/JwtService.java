@@ -18,8 +18,8 @@ import java.util.function.Function;
  * Serwis obsługujący operacje na tokenach JWT.
  * Odpowiedzialny za generowanie, walidację i ekstrakcję danych z tokenów.
  */
-@Service
-public class JwtService {
+@Service("jwtServiceTarget")
+public class JwtService implements TokenService {
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -33,6 +33,7 @@ public class JwtService {
      * @param token Token JWT
      * @return Nazwa użytkownika (email)
      */
+    @Override
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -55,6 +56,7 @@ public class JwtService {
      * @param userDetails Szczegóły użytkownika
      * @return Wygenerowany token JWT
      */
+    @Override
     public String generateToken(UserDetails userDetails) {
         return generateToken(new HashMap<>(), userDetails);
     }
@@ -66,6 +68,7 @@ public class JwtService {
      * @param userDetails Szczegóły użytkownika
      * @return Wygenerowany token JWT
      */
+    @Override
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
@@ -100,6 +103,7 @@ public class JwtService {
      * @param userDetails Szczegóły użytkownika
      * @return true jeśli token jest ważny, false w przeciwnym wypadku
      */
+    @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);

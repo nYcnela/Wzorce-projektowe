@@ -6,13 +6,13 @@ import ma.swiftrent.dto.LoginRequest;
 import ma.swiftrent.dto.RegisterRequest;
 import ma.swiftrent.entity.User;
 import ma.swiftrent.repository.UserRepository;
-import ma.swiftrent.security.JwtService;
+import ma.swiftrent.security.TokenService;
+import ma.swiftrent.security.flyweight.RoleProfileFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -24,7 +24,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final TokenService tokenService;
     private final AuthenticationManager authenticationManager;
 
     /**
@@ -50,9 +50,7 @@ public class AuthService {
         userRepository.save(user);
 
         // Generuje token JWT z rolą
-        Map<String, Object> extraClaims = new HashMap<>();
-        extraClaims.put("role", user.getRole().name());
-        var jwtToken = jwtService.generateToken(extraClaims, user);
+        var jwtToken = tokenService.generateToken(buildRoleClaims(user), user);
 
         return AuthResponse.builder()
                 .token(jwtToken)
@@ -81,14 +79,16 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
         // Generuje token JWT z rolą
-        Map<String, Object> extraClaims = new HashMap<>();
-        extraClaims.put("role", user.getRole().name());
-        var jwtToken = jwtService.generateToken(extraClaims, user);
+        var jwtToken = tokenService.generateToken(buildRoleClaims(user), user);
 
         return AuthResponse.builder()
                 .token(jwtToken)
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    private Map<String, Object> buildRoleClaims(User user) {
+        return RoleProfileFactory.forRole(user.getRole()).copyDefaultClaims();
     }
 }

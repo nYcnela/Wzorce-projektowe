@@ -5,8 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import ma.swiftrent.pattern.prototype.Prototype;
+import ma.swiftrent.security.flyweight.RoleProfileFactory;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.ArrayList;
@@ -54,7 +54,7 @@ public class User implements UserDetails, Prototype<User> {
      */
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+        return RoleProfileFactory.forRole(role).getAuthorities();
     }
 
     @Override
