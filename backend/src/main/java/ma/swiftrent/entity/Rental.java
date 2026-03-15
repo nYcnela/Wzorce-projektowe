@@ -47,21 +47,18 @@ public class Rental implements Prototype<Rental> {
     /*
         Tydzień 2, Wzorzec Prototype 3
         Tworzy nowy obiekt klasy Rental poprzez
-        kopiowanie istniejacej już instancji
-        za pomocą konstruktora kopiującego
+        kopiowanie istniejącej już instancji
+        za pomocą buildera
     */
-    public Rental(Rental source){
-        this.user = source.user;
-        this.car = source.car;
-        this.startDate = source.startDate;
-        this.endDate = source.endDate;
-        this.totalCost = source.totalCost;
-        this.status = source.status;
-    }
 
     @Override
     public Rental clone() {
-        return new Rental(this);
+        return Rental.builder()
+                .user(this.user)
+                .car(this.car)
+                .startDate(this.startDate)
+                .endDate(this.endDate)
+                .build();
     }
     //Koniec, Tydzień 2, Wzorzec Prototype 3
 
