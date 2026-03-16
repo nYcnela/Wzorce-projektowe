@@ -9,6 +9,8 @@ import ma.swiftrent.pattern.prototype.UserPrototypeRegistry;
 import ma.swiftrent.repository.UserRepository;
 import ma.swiftrent.security.TokenService;
 import ma.swiftrent.security.flyweight.RoleProfileFactory;
+import ma.swiftrent.service.logger.AppLogger;
+import ma.swiftrent.service.logger.Slf4jLoggerAdapter;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +29,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final AuthenticationManager authenticationManager;
+
+    AppLogger logger = new Slf4jLoggerAdapter(AuthService.class);
 
     /**
      * Rejestruje nowego użytkownika w systemie.
@@ -62,6 +66,7 @@ public class AuthService {
 
         //Koniec, Tydzień 2, Wzorzec Prototype 2
 
+        logger.logInfo("Rejestracja użytkownika");
         userRepository.save(user);
 
         // Generuje token JWT z rolą
@@ -95,6 +100,8 @@ public class AuthService {
 
         // Generuje token JWT z rolą
         var jwtToken = tokenService.generateToken(buildRoleClaims(user), user);
+
+        logger.logInfo("Logowanie użytkownika");
 
         return AuthResponse.builder()
                 .token(jwtToken)

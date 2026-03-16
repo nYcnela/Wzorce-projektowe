@@ -6,6 +6,8 @@ import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
+import ma.swiftrent.service.logger.AppLogger;
+import ma.swiftrent.service.logger.LoggerInheritanceAdapter;
 import ma.swiftrent.service.storage.FileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ public class CarService implements CarOperationsService {
     private final CarRepository carRepository;
     private final RentalRepository rentalRepository;
     private final FileStorageService fileStorageService;
+    private final AppLogger logger = new LoggerInheritanceAdapter();
 
     private CarResponse mapToResponse(Car car) {
         CarResponse response = CarResponse.fromEntity(car);
@@ -138,6 +141,7 @@ public class CarService implements CarOperationsService {
         if (!carRepository.existsById(id)) {
             throw new RuntimeException("Samochód o ID " + id + " nie został znaleziony");
         }
+        logger.logInfo("Usunięto samochód");
         carRepository.deleteById(id);
     }
 
@@ -154,6 +158,7 @@ public class CarService implements CarOperationsService {
         Car copy = original.clone();
         copy.setId(null);
 
+        logger.logInfo("Zduplikowano samochód");
         Car saved = carRepository.save(copy);
 
         return mapToResponse(saved);
