@@ -5,6 +5,7 @@ import ma.swiftrent.dto.AuthResponse;
 import ma.swiftrent.dto.LoginRequest;
 import ma.swiftrent.dto.RegisterRequest;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.prototype.UserPrototypeRegistry;
 import ma.swiftrent.repository.UserRepository;
 import ma.swiftrent.security.TokenService;
 import ma.swiftrent.security.flyweight.RoleProfileFactory;
@@ -41,11 +42,25 @@ public class AuthService {
         }
 
         // Tworzy nowego użytkownika
-        var user = User.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .userRole()
-                .build();
+//        var user = User.builder()
+//                .email(request.getEmail())
+//                .password(passwordEncoder.encode(request.getPassword()))
+//                .userRole()
+//                .build();
+        /*
+        Tydzień 2, Wzorzec Prototype 2
+        Wykorzystanie schematu użytkwonika z rejetru prototypów
+        do stworzenia nowego użytkownika podczas rejestracji
+         */
+        var user = UserPrototypeRegistry.getPrototype("user-template");
+        if (user == null) {
+            throw new RuntimeException("Prototyp użytkownika nie został zarejestrowany");
+        }
+
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        //Koniec, Tydzień 2, Wzorzec Prototype 2
 
         userRepository.save(user);
 

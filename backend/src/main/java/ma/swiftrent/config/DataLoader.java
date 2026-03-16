@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.prototype.UserPrototypeRegistry;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Ładuje przykładowe dane do bazy podczas startu aplikacji.
@@ -39,6 +41,13 @@ public class DataLoader implements CommandLineRunner {
     private void loadUsers() {
         if (userRepository.count() > 0) {
             log.info("Użytkownicy już istnieją w bazie.");
+            Optional<User> admin = userRepository.findByEmail("admin@swiftrent.pl");
+            Optional<User> user = userRepository.findByEmail("user@swiftrent.pl");
+
+            // rejestracja prototypów
+            UserPrototypeRegistry.addPrototype("admin-template", admin.orElse(null));
+            UserPrototypeRegistry.addPrototype("user-template", user.orElse(null));
+            log.info("Dodano prototypy użytkowników");
             return;
         }
 
@@ -55,7 +64,11 @@ public class DataLoader implements CommandLineRunner {
                 .build();
 
         userRepository.saveAll(Arrays.asList(admin, user));
-        
+
+        // rejestracja prototypów
+        UserPrototypeRegistry.addPrototype("admin-template", admin);
+        UserPrototypeRegistry.addPrototype("user-template", user);
+        log.info("Dodano prototypy użytkowników");
         log.info("Utworzono użytkowników testowych:");
         log.info("   - Admin: admin / admin");
         log.info("   - User: user / user");
