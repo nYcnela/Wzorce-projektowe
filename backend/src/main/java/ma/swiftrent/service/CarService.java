@@ -4,12 +4,8 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
-<<<<<<< HEAD
 import ma.swiftrent.pattern.factory.CarResponseFactory;
 import ma.swiftrent.pattern.factory.CarSortFactory;
-import ma.swiftrent.pattern.singleton.UploadStorageSettings;
-=======
->>>>>>> e45b4e6cf112f1a983767118d0419b0fd7c44686
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.service.storage.FileStorageService;
