@@ -1,6 +1,7 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.composite.notification.NotificationComponent;
 import ma.swiftrent.composite.rentalPackage.RentalPackage;
 import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
 import ma.swiftrent.dto.CarResponse;
@@ -49,6 +50,8 @@ public class RentalService {
     RentalPrice price;
     AppLogger appLogger = new ConsoleLogger();
     NotificationService notification = new BasicNotificationService();
+    private NotificationServiceFactory notificationServiceFactory;
+    NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
 
     /**
      * Tworzy nowe wypożyczenie samochodu.
@@ -102,6 +105,7 @@ public class RentalService {
         notification = new EmailNotificationDecorator(notification);
         notification = new SmsNotificationDecorator(notification);
         notification.send("Zarejestrowano na twoim konice nowe wypożyczenie.");
+        notification2.send("Samochód został wypożyczony przez: " + user.getEmail());
 
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
