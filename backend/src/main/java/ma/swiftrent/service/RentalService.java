@@ -1,6 +1,8 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.composite.rentalPackage.RentalPackage;
+import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
@@ -290,5 +292,25 @@ public class RentalService {
         copy.setId(null);
         Rental saved = rentalRepository.save(copy);
         return RentalResponse.fromEntity(saved);
+    }
+
+    public RentalPackage createPremiumPackage(double carPricePerDay, int days) {
+
+        RentalServiceItem carRental =
+                new RentalServiceItem("Wynajem samochodu", carPricePerDay * days);
+
+        RentalServiceItem insurance =
+                new RentalServiceItem("Ubezpieczenie", 50);
+
+        RentalServiceItem gps =
+                new RentalServiceItem("GPS", 20);
+
+        RentalPackage premiumPackage = new RentalPackage("Pakiet Premium");
+
+        premiumPackage.add(carRental);
+        premiumPackage.add(insurance);
+        premiumPackage.add(gps);
+
+        return premiumPackage;
     }
 }

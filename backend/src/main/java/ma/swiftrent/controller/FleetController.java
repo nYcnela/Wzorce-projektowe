@@ -1,6 +1,6 @@
 package ma.swiftrent.controller;
 
-import ma.swiftrent.composite.CarGroup;
+import ma.swiftrent.composite.fleet.CarGroup;
 import ma.swiftrent.service.FleetService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

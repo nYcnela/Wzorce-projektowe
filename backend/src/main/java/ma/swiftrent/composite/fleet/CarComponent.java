@@ -1,4 +1,4 @@
-package ma.swiftrent.composite;
+package ma.swiftrent.composite.fleet;
 
 /*
     Tydzień 3, Wzorzec Composite 1

@@ -1,7 +1,7 @@
 package ma.swiftrent.service;
 
-import ma.swiftrent.composite.CarGroup;
-import ma.swiftrent.composite.CarLeaf;
+import ma.swiftrent.composite.fleet.CarGroup;
+import ma.swiftrent.composite.fleet.CarLeaf;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.repository.CarRepository;
 import org.springframework.stereotype.Service;

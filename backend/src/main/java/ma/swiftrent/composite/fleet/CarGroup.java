@@ -1,4 +1,4 @@
-package ma.swiftrent.composite;
+package ma.swiftrent.composite.fleet;
 
 import lombok.Getter;
 
