@@ -4,8 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.prototype.UserPrototypeRegistry;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.UserRepository;
+import ma.swiftrent.service.logger.AppLogger;
+import ma.swiftrent.service.logger.ConsoleLogger;
+import ma.swiftrent.service.logger.SecurityLoggerDecorator;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -13,6 +17,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Ładuje przykładowe dane do bazy podczas startu aplikacji.
@@ -26,6 +31,7 @@ public class DataLoader implements CommandLineRunner {
     private final UserRepository userRepository;
     private final CarRepository carRepository;
     private final PasswordEncoder passwordEncoder;
+    AppLogger logger = new ConsoleLogger();
 
     @Override
     public void run(String... args) {
@@ -37,8 +43,16 @@ public class DataLoader implements CommandLineRunner {
      * Ładuje przykładowych użytkowników.
      */
     private void loadUsers() {
+        logger = new SecurityLoggerDecorator(logger);
         if (userRepository.count() > 0) {
-            log.info("Użytkownicy już istnieją w bazie.");
+            logger.logInfo("Użytkownicy już istnieją w bazie.");
+            Optional<User> admin = userRepository.findByEmail("admin@swiftrent.pl");
+            Optional<User> user = userRepository.findByEmail("user@swiftrent.pl");
+
+            // rejestracja prototypów
+            UserPrototypeRegistry.addPrototype("admin-template", admin.orElse(null));
+            UserPrototypeRegistry.addPrototype("user-template", user.orElse(null));
+            log.info("Dodano prototypy użytkowników");
             return;
         }
 
@@ -55,7 +69,11 @@ public class DataLoader implements CommandLineRunner {
                 .build();
 
         userRepository.saveAll(Arrays.asList(admin, user));
-        
+
+        // rejestracja prototypów
+        UserPrototypeRegistry.addPrototype("admin-template", admin);
+        UserPrototypeRegistry.addPrototype("user-template", user);
+        log.info("Dodano prototypy użytkowników");
         log.info("Utworzono użytkowników testowych:");
         log.info("   - Admin: admin / admin");
         log.info("   - User: user / user");

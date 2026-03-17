@@ -1,6 +1,10 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.composite.notification.NotificationComponent;
+import ma.swiftrent.composite.rentalPackage.RentalPackage;
+import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
+import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
@@ -14,6 +18,17 @@ import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
+import ma.swiftrent.service.logger.AppLogger;
+import ma.swiftrent.service.logger.ConsoleLogger;
+import ma.swiftrent.service.logger.TimestampLoggerDecorator;
+import ma.swiftrent.service.notification.BasicNotificationService;
+import ma.swiftrent.service.notification.EmailNotificationDecorator;
+import ma.swiftrent.service.notification.NotificationService;
+import ma.swiftrent.service.notification.SmsNotificationDecorator;
+import ma.swiftrent.service.price.BasicRentalPrice;
+import ma.swiftrent.service.price.GpsDecorator;
+import ma.swiftrent.service.price.InsuranceDecorator;
+import ma.swiftrent.service.price.RentalPrice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +50,11 @@ public class RentalService {
     private final UserRepository userRepository;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
+    RentalPrice price;
+    AppLogger appLogger = new ConsoleLogger();
+    NotificationService notification = new BasicNotificationService();
+    private NotificationServiceFactory notificationServiceFactory;
+    NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
 
     // Tydzień 3, Wzorzec Factory Method 2 – użycie RentalResponseFactory (ConcreteCreator)
     private final RentalResponseFactory rentalResponseFactory = new RentalResponseFactory();
@@ -66,7 +86,15 @@ public class RentalService {
         }
 
         // Oblicza całkowity koszt
-        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        if (request.getInsuranceSelected()) {
+            price = new InsuranceDecorator(price);
+        }
+        if (request.getGpsSelected()) {
+            price = new GpsDecorator(price);
+        }
+        BigDecimal totalCost = price.calculateTotalCost();
+//        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
 
         // Tworzy wypożyczenie
         Rental rental = Rental.builder()
@@ -77,6 +105,13 @@ public class RentalService {
                 .totalCost(totalCost)
                 .active()
                 .build();
+
+        appLogger = new TimestampLoggerDecorator(appLogger);
+        appLogger.logInfo("Dokonano rezerwacji.");
+        notification = new EmailNotificationDecorator(notification);
+        notification = new SmsNotificationDecorator(notification);
+        notification.send("Zarejestrowano na twoim konice nowe wypożyczenie.");
+        notification2.send("Samochód został wypożyczony przez: " + user.getEmail());
 
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
@@ -229,5 +264,40 @@ public class RentalService {
         // Liczenie dni włącznie: z 8/01 na 9/01 = 2 dni (8/01 + 9/01)
         long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
         return pricePerDay.multiply(BigDecimal.valueOf(days));
+    }
+
+    /**
+     * Duplikuje wypożyczenie wykorzystując do tego wzorzec prototypu
+     */
+    @Transactional
+    public RentalResponse duplicateRental(Long id) {
+
+        Rental original = rentalRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Wypożyczenie o ID " + id + " nie istnieje"));
+
+        Rental copy = original.clone();
+        copy.setId(null);
+        Rental saved = rentalRepository.save(copy);
+        return RentalResponse.fromEntity(saved);
+    }
+
+    public RentalPackage createPremiumPackage(double carPricePerDay, int days) {
+
+        RentalServiceItem carRental =
+                new RentalServiceItem("Wynajem samochodu", carPricePerDay * days);
+
+        RentalServiceItem insurance =
+                new RentalServiceItem("Ubezpieczenie", 50);
+
+        RentalServiceItem gps =
+                new RentalServiceItem("GPS", 20);
+
+        RentalPackage premiumPackage = new RentalPackage("Pakiet Premium");
+
+        premiumPackage.add(carRental);
+        premiumPackage.add(insurance);
+        premiumPackage.add(gps);
+
+        return premiumPackage;
     }
 }
