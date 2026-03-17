@@ -3,7 +3,7 @@ package ma.swiftrent.service.storage;
 import org.springframework.web.multipart.MultipartFile;
 
 /*
-    Tydzień 2, Wzorzec Adapter 3
+    Tydzień 3, Wzorzec Adapter 3
     Adapter pomiędzy interfejsem do zapisu plików, a klasą do zapisu plików json
  */
 public class JsonStorageAdapter implements FileStorageService {
@@ -29,4 +29,4 @@ public class JsonStorageAdapter implements FileStorageService {
 
     }
 }
-//Koniec, Tydzień 2, Wzorzec Adapter 3
+//Koniec, Tydzień 3, Wzorzec Adapter 3

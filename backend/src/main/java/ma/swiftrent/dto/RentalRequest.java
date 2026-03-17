@@ -28,4 +28,7 @@ public class RentalRequest {
     @NotNull(message = "Data zakończenia nie może być pusta")
     @FutureOrPresent(message = "Data zakończenia nie może być w przeszłości")
     private LocalDate endDate;
+
+    private Boolean insuranceSelected;
+    private Boolean gpsSelected;
 }

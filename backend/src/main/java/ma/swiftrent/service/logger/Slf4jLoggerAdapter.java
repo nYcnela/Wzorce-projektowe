@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /*
-    Tydzień 2, Wzorzec Adapter 1
+    Tydzień 3, Wzorzec Adapter 1
     Adapter pomiędzy loggerem w naszym projekcie, a loggerem Slf4j
     Implementacja w formie kompozycji
  */
@@ -26,4 +26,4 @@ public class Slf4jLoggerAdapter implements AppLogger {
         logger.error(message);
     }
 }
-//Koniec Tydzień 2, Wzorzec Adapter 2
+//Koniec Tydzień 3, Wzorzec Adapter 2

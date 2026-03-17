@@ -11,6 +11,10 @@ import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
+import ma.swiftrent.service.price.BasicRentalPrice;
+import ma.swiftrent.service.price.GpsDecorator;
+import ma.swiftrent.service.price.InsuranceDecorator;
+import ma.swiftrent.service.price.RentalPrice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +36,7 @@ public class RentalService {
     private final UserRepository userRepository;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
+    RentalPrice price;
 
     /**
      * Tworzy nowe wypożyczenie samochodu.
@@ -60,7 +65,15 @@ public class RentalService {
         }
 
         // Oblicza całkowity koszt
-        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        if (request.getInsuranceSelected()) {
+            price = new InsuranceDecorator(price);
+        }
+        if (request.getGpsSelected()) {
+            price = new GpsDecorator(price);
+        }
+        BigDecimal totalCost = price.calculateTotalCost();
+//        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
 
         // Tworzy wypożyczenie
         Rental rental = Rental.builder()
