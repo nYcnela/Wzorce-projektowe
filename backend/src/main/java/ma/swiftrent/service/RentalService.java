@@ -50,7 +50,7 @@ public class RentalService {
     RentalPrice price;
     AppLogger appLogger = new ConsoleLogger();
     NotificationService notification = new BasicNotificationService();
-    private NotificationServiceFactory notificationServiceFactory;
+    private NotificationServiceFactory notificationServiceFactory = new NotificationServiceFactory();
     NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
 
     /**
