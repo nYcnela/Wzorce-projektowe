@@ -1,6 +1,7 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
@@ -259,5 +260,20 @@ public class RentalService {
         // Liczenie dni włącznie: z 8/01 na 9/01 = 2 dni (8/01 + 9/01)
         long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
         return pricePerDay.multiply(BigDecimal.valueOf(days));
+    }
+
+    /**
+     * Duplikuje wypożyczenie wykorzystując do tego wzorzec prototypu
+     */
+    @Transactional
+    public RentalResponse duplicateRental(Long id) {
+
+        Rental original = rentalRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Wypożyczenie o ID " + id + " nie istnieje"));
+
+        Rental copy = original.clone();
+        copy.setId(null);
+        Rental saved = rentalRepository.save(copy);
+        return RentalResponse.fromEntity(saved);
     }
 }
