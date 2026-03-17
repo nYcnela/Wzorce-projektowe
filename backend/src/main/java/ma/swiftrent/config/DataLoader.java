@@ -7,6 +7,9 @@ import ma.swiftrent.entity.User;
 import ma.swiftrent.pattern.prototype.UserPrototypeRegistry;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.UserRepository;
+import ma.swiftrent.service.logger.AppLogger;
+import ma.swiftrent.service.logger.ConsoleLogger;
+import ma.swiftrent.service.logger.SecurityLoggerDecorator;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -28,6 +31,7 @@ public class DataLoader implements CommandLineRunner {
     private final UserRepository userRepository;
     private final CarRepository carRepository;
     private final PasswordEncoder passwordEncoder;
+    AppLogger logger = new ConsoleLogger();
 
     @Override
     public void run(String... args) {
@@ -39,8 +43,9 @@ public class DataLoader implements CommandLineRunner {
      * Ładuje przykładowych użytkowników.
      */
     private void loadUsers() {
+        logger = new SecurityLoggerDecorator(logger);
         if (userRepository.count() > 0) {
-            log.info("Użytkownicy już istnieją w bazie.");
+            logger.logInfo("Użytkownicy już istnieją w bazie.");
             Optional<User> admin = userRepository.findByEmail("admin@swiftrent.pl");
             Optional<User> user = userRepository.findByEmail("user@swiftrent.pl");
 
