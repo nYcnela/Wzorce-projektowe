@@ -2,7 +2,9 @@ package ma.swiftrent.controller;
 
 import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarResponse;
+import ma.swiftrent.dto.CatalogViewResponse;
 import ma.swiftrent.dto.UserResponse;
+import ma.swiftrent.service.CatalogFacade;
 import ma.swiftrent.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +20,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final CatalogFacade catalogFacade;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -41,5 +44,13 @@ public class UserController {
     @GetMapping("/favorites")
     public ResponseEntity<List<CarResponse>> getFavorites(@AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(userService.getUserFavorites(userDetails.getUsername()));
+    }
+
+    @GetMapping("/catalog")
+    public ResponseEntity<CatalogViewResponse> getUserCatalog(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) String sortBy
+    ) {
+        return ResponseEntity.ok(catalogFacade.getUserCatalog(userDetails.getUsername(), sortBy));
     }
 }
