@@ -15,6 +15,10 @@ import ma.swiftrent.repository.UserRepository;
 import ma.swiftrent.service.logger.AppLogger;
 import ma.swiftrent.service.logger.ConsoleLogger;
 import ma.swiftrent.service.logger.TimestampLoggerDecorator;
+import ma.swiftrent.service.notification.BasicNotificationService;
+import ma.swiftrent.service.notification.EmailNotificationDecorator;
+import ma.swiftrent.service.notification.NotificationService;
+import ma.swiftrent.service.notification.SmsNotificationDecorator;
 import ma.swiftrent.service.price.BasicRentalPrice;
 import ma.swiftrent.service.price.GpsDecorator;
 import ma.swiftrent.service.price.InsuranceDecorator;
@@ -42,6 +46,7 @@ public class RentalService {
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
     RentalPrice price;
     AppLogger appLogger = new ConsoleLogger();
+    NotificationService notification = new BasicNotificationService();
 
     /**
      * Tworzy nowe wypożyczenie samochodu.
@@ -92,6 +97,9 @@ public class RentalService {
 
         appLogger = new TimestampLoggerDecorator(appLogger);
         appLogger.logInfo("Dokonano rezerwacji.");
+        notification = new EmailNotificationDecorator(notification);
+        notification = new SmsNotificationDecorator(notification);
+        notification.send("Zarejestrowano na twoim konice nowe wypożyczenie.");
 
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {

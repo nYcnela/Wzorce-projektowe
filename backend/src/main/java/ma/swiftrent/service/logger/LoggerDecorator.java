@@ -13,3 +13,4 @@ public abstract class LoggerDecorator implements AppLogger {
         this.logger = logger;
     }
 }
+//Koniec Tydzień 3, Wzorzec Decorator 2
