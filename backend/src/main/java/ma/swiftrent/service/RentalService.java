@@ -6,6 +6,9 @@ import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.factory.CancelRentalActionFactory;
+import ma.swiftrent.pattern.factory.RentalResponseFactory;
+import ma.swiftrent.pattern.factory.ReturnRentalActionFactory;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
@@ -32,6 +35,9 @@ public class RentalService {
     private final UserRepository userRepository;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
+
+    // Tydzień 3, Wzorzec Factory Method 2 – użycie RentalResponseFactory (ConcreteCreator)
+    private final RentalResponseFactory rentalResponseFactory = new RentalResponseFactory();
 
     /**
      * Tworzy nowe wypożyczenie samochodu.
@@ -79,7 +85,7 @@ public class RentalService {
         }
 
         Rental savedRental = rentalRepository.save(rental);
-        return RentalResponse.fromEntity(savedRental);
+        return rentalResponseFactory.create(savedRental);
     }
 
     /**
@@ -104,27 +110,9 @@ public class RentalService {
             throw new RuntimeException("Wypożyczenie nie jest aktywne");
         }
 
-        // Aktualizacja daty zakończenia na dzisiejszą (jeśli zwrócono wcześniej lub później)
-        LocalDate today = applicationClock.today();
-        rental.setEndDate(today);
-        
-        // Ponowne przeliczenie kosztu na podstawie faktycznego czasu trwania
-        // Jeśli anulowano przed rozpoczęciem (dzisiaj < startDate), koszt = 0
-        BigDecimal actualCost;
-        if (today.isBefore(rental.getStartDate())) {
-            actualCost = BigDecimal.ZERO;
-        } else {
-            actualCost = calculateTotalCost(rental.getCar().getPricePerDay(), rental.getStartDate(), today);
-        }
-        rental.setTotalCost(actualCost);
-
-        rental.setStatus(Rental.RentalStatus.COMPLETED);
-        
-        // "zwolnienie" samochodu
-        Car car = rental.getCar();
-        car.setStatus(Car.CarStatus.AVAILABLE);
-        carRepository.save(car);
-        
+        // Tydzień 3, Wzorzec Factory Method 3 – fabryka tworzy i wykonuje akcję zwrotu
+        new ReturnRentalActionFactory(applicationClock).process(rental);
+        carRepository.save(rental.getCar());
         rentalRepository.save(rental);
     }
 
@@ -157,9 +145,8 @@ public class RentalService {
             throw new RuntimeException("Nie można anulować wypożyczenia, które już się rozpoczęło. Użyj opcji zwrotu.");
         }
 
-        // Anulowanie - bez opłaty
-        rental.setStatus(Rental.RentalStatus.CANCELLED);
-        rental.setTotalCost(BigDecimal.ZERO);
+        // Tydzień 3, Wzorzec Factory Method 3 – fabryka tworzy i wykonuje akcję anulowania
+        new CancelRentalActionFactory().process(rental);
         rentalRepository.save(rental);
     }
 
@@ -174,9 +161,7 @@ public class RentalService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
-        return rentalRepository.findByUserId(user.getId()).stream()
-                .map(RentalResponse::fromEntity)
-                .collect(Collectors.toList());
+        return rentalResponseFactory.createAll(rentalRepository.findByUserId(user.getId()));
     }
 
     /**
@@ -186,9 +171,7 @@ public class RentalService {
      */
     @Transactional(readOnly = true)
     public List<RentalResponse> getAllRentals() {
-        return rentalRepository.findAll().stream()
-                .map(RentalResponse::fromEntity)
-                .collect(Collectors.toList());
+        return rentalResponseFactory.createAll(rentalRepository.findAll());
     }
 
     /**
@@ -199,7 +182,7 @@ public class RentalService {
         return rentalRepository.findAll().stream()
                 .filter(r -> r.getCar().getId().equals(carId))
                 .filter(r -> r.getStatus() != Rental.RentalStatus.CANCELLED && r.getStatus() != Rental.RentalStatus.COMPLETED)
-                .map(RentalResponse::fromEntity)
+                .map(rentalResponseFactory::create)
                 .collect(Collectors.toList());
     }
 

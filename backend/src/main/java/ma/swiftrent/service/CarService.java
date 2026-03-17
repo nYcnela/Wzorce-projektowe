@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
+import ma.swiftrent.pattern.factory.CarResponseFactory;
+import ma.swiftrent.pattern.factory.CarSortFactory;
 import ma.swiftrent.pattern.singleton.UploadStorageSettings;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
@@ -31,8 +33,11 @@ public class CarService {
     private final RentalRepository rentalRepository;
     private final UploadStorageSettings uploadStorageSettings = UploadStorageSettings.getInstance();
 
+    // Tydzień 3, Wzorzec Factory Method 1 – użycie CarResponseFactory (ConcreteCreator)
+    private final CarResponseFactory carResponseFactory = new CarResponseFactory();
+
     private CarResponse mapToResponse(Car car) {
-        CarResponse response = CarResponse.fromEntity(car);
+        CarResponse response = carResponseFactory.create(car);
         if (car.getStatus() != Car.CarStatus.AVAILABLE) {
             java.time.LocalDate latestEnd = rentalRepository.findLatestEndDate(car.getId());
             if (latestEnd != null) {
@@ -81,19 +86,8 @@ public class CarService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
-        if (sortBy != null) {
-            switch (sortBy) {
-                case "price-asc":
-                    cars.sort((a, b) -> a.getPricePerDay().compareTo(b.getPricePerDay()));
-                    break;
-                case "price-desc":
-                    cars.sort((a, b) -> b.getPricePerDay().compareTo(a.getPricePerDay()));
-                    break;
-                default:
-                    // Brak sortowania
-                    break;
-            }
-        }
+        // Tydzień 3, Wzorzec Factory Method 2 – CarSortFactory tworzy odpowiedni komparator
+        cars.sort(CarSortFactory.forStrategy(sortBy).createComparator());
 
         return cars;
     }

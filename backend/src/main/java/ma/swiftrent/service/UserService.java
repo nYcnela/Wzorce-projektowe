@@ -5,6 +5,8 @@ import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.dto.UserResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.factory.CarResponseFactory;
+import ma.swiftrent.pattern.factory.UserResponseFactory;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -21,10 +23,12 @@ public class UserService {
     private final CarRepository carRepository;
     private final ma.swiftrent.repository.RentalRepository rentalRepository;
 
+    // Tydzień 3, Wzorzec Factory Method 3 – użycie UserResponseFactory i CarResponseFactory (ConcreteCreator)
+    private final UserResponseFactory userResponseFactory = new UserResponseFactory();
+    private final CarResponseFactory carResponseFactory = new CarResponseFactory();
+
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(UserResponse::fromEntity)
-                .collect(Collectors.toList());
+        return userResponseFactory.createAll(userRepository.findAll());
     }
 
     @Transactional
@@ -70,11 +74,6 @@ public class UserService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie znaleziony"));
 
-        return user.getFavorites().stream()
-                .map(car -> {
-                    CarResponse response = CarResponse.fromEntity(car);
-                    return response;
-                })
-                .collect(Collectors.toList());
+        return carResponseFactory.createAll(user.getFavorites());
     }
 }
