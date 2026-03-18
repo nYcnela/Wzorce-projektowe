@@ -14,10 +14,8 @@ import java.util.Comparator;
 */
 public abstract class CarSortFactory {
 
-    // Metoda fabryczna – nadpisywana przez podklasy (ConcreteCreator)
     public abstract Comparator<CarResponse> createComparator();
 
-    // Wybiera odpowiednią fabrykę na podstawie nazwy strategii
     public static CarSortFactory forStrategy(String sortBy) {
         if (sortBy == null) {
             return new DefaultSortFactory();

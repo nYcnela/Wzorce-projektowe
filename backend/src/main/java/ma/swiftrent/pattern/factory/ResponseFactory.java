@@ -13,10 +13,8 @@ import java.util.stream.Collectors;
 */
 public abstract class ResponseFactory<E, R> {
 
-    // Metoda fabryczna – nadpisywana przez podklasy (ConcreteCreator)
     public abstract R create(E entity);
 
-    // Metoda szablonowa – używa metody fabrycznej do przetworzenia całej listy
     public List<R> createAll(List<E> entities) {
         return entities.stream()
                 .map(this::create)

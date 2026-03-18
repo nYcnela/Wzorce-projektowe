@@ -12,10 +12,8 @@ import ma.swiftrent.entity.Rental;
 */
 public abstract class RentalStatusActionFactory {
 
-    // Metoda fabryczna – nadpisywana przez podklasy (ConcreteCreator)
     public abstract RentalStatusAction createAction();
 
-    // Metoda szablonowa – używa metody fabrycznej
     public void process(Rental rental) {
         RentalStatusAction action = createAction();
         action.execute(rental);
