@@ -1,10 +1,8 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
-import ma.swiftrent.composite.notification.NotificationComponent;
 import ma.swiftrent.composite.rentalPackage.RentalPackage;
 import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
-import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
@@ -13,18 +11,15 @@ import ma.swiftrent.entity.User;
 import ma.swiftrent.pattern.factory.CancelRentalActionFactory;
 import ma.swiftrent.pattern.factory.RentalResponseFactory;
 import ma.swiftrent.pattern.factory.ReturnRentalActionFactory;
+import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedEvent;
+import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedSubject;
+import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedEvent;
+import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedSubject;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
-import ma.swiftrent.service.logger.AppLogger;
-import ma.swiftrent.service.logger.ConsoleLogger;
-import ma.swiftrent.service.logger.TimestampLoggerDecorator;
-import ma.swiftrent.service.notification.BasicNotificationService;
-import ma.swiftrent.service.notification.EmailNotificationDecorator;
-import ma.swiftrent.service.notification.NotificationService;
-import ma.swiftrent.service.notification.SmsNotificationDecorator;
 import ma.swiftrent.service.price.BasicRentalPrice;
 import ma.swiftrent.service.price.GpsDecorator;
 import ma.swiftrent.service.price.InsuranceDecorator;
@@ -48,13 +43,10 @@ public class RentalService {
     private final RentalRepository rentalRepository;
     private final CarRepository carRepository;
     private final UserRepository userRepository;
+    private final RentalCreatedSubject rentalCreatedSubject;
+    private final RentalStatusChangedSubject rentalStatusChangedSubject;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
-    RentalPrice price;
-    AppLogger appLogger = new ConsoleLogger();
-    NotificationService notification = new BasicNotificationService();
-    private NotificationServiceFactory notificationServiceFactory = new NotificationServiceFactory();
-    NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
 
     // Tydzień 3, Wzorzec Factory Method 2 – użycie RentalResponseFactory (ConcreteCreator)
     private final RentalResponseFactory rentalResponseFactory = new RentalResponseFactory();
@@ -86,7 +78,7 @@ public class RentalService {
         }
 
         // Oblicza całkowity koszt
-        price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        RentalPrice price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
         if (request.getInsuranceSelected()) {
             price = new InsuranceDecorator(price);
         }
@@ -106,13 +98,6 @@ public class RentalService {
                 .active()
                 .build();
 
-        appLogger = new TimestampLoggerDecorator(appLogger);
-        appLogger.logInfo("Dokonano rezerwacji.");
-        notification = new EmailNotificationDecorator(notification);
-        notification = new SmsNotificationDecorator(notification);
-        notification.send("Zarejestrowano na twoim konice nowe wypożyczenie.");
-        notification2.send("Samochód został wypożyczony przez: " + user.getEmail());
-
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
             car.setStatus(Car.CarStatus.UNAVAILABLE);
@@ -120,6 +105,12 @@ public class RentalService {
         }
 
         Rental savedRental = rentalRepository.save(rental);
+        rentalCreatedSubject.notifyObservers(new RentalCreatedEvent(
+                savedRental.getId(),
+                car.getId(),
+                user.getEmail(),
+                savedRental.getTotalCost()
+        ));
         return rentalResponseFactory.create(savedRental);
     }
 
@@ -133,6 +124,7 @@ public class RentalService {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
         Rental rental = rentalRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
+        Rental.RentalStatus previousStatus = rental.getStatus();
 
         // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
@@ -149,6 +141,13 @@ public class RentalService {
         new ReturnRentalActionFactory(applicationClock).process(rental);
         carRepository.save(rental.getCar());
         rentalRepository.save(rental);
+        rentalStatusChangedSubject.notifyObservers(new RentalStatusChangedEvent(
+                rental.getId(),
+                rental.getCar().getId(),
+                userEmail,
+                previousStatus,
+                rental.getStatus()
+        ));
     }
 
     /**
@@ -161,6 +160,7 @@ public class RentalService {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
         Rental rental = rentalRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
+        Rental.RentalStatus previousStatus = rental.getStatus();
 
         // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
@@ -183,6 +183,13 @@ public class RentalService {
         // Tydzień 3, Wzorzec Factory Method 3 – fabryka tworzy i wykonuje akcję anulowania
         new CancelRentalActionFactory().process(rental);
         rentalRepository.save(rental);
+        rentalStatusChangedSubject.notifyObservers(new RentalStatusChangedEvent(
+                rental.getId(),
+                rental.getCar().getId(),
+                userEmail,
+                previousStatus,
+                rental.getStatus()
+        ));
     }
 
     /**

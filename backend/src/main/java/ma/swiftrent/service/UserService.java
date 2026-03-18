@@ -7,13 +7,14 @@ import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.User;
 import ma.swiftrent.pattern.factory.CarResponseFactory;
 import ma.swiftrent.pattern.factory.UserResponseFactory;
+import ma.swiftrent.pattern.observer.favorite.FavoriteChangedEvent;
+import ma.swiftrent.pattern.observer.favorite.FavoriteChangedSubject;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +23,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final CarRepository carRepository;
     private final ma.swiftrent.repository.RentalRepository rentalRepository;
+    private final FavoriteChangedSubject favoriteChangedSubject;
 
     // Tydzień 3, Wzorzec Factory Method 3 – użycie UserResponseFactory i CarResponseFactory (ConcreteCreator)
     private final UserResponseFactory userResponseFactory = new UserResponseFactory();
@@ -61,12 +63,16 @@ public class UserService {
         Car car = carRepository.findById(carId)
                 .orElseThrow(() -> new RuntimeException("Samochód nie znaleziony"));
 
+        boolean added;
         if (user.getFavorites().contains(car)) {
             user.getFavorites().remove(car);
+            added = false;
         } else {
             user.getFavorites().add(car);
+            added = true;
         }
         userRepository.save(user);
+        favoriteChangedSubject.notifyObservers(new FavoriteChangedEvent(userEmail, carId, added));
     }
 
     @Transactional(readOnly = true)
