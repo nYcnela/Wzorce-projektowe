@@ -1,6 +1,7 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.dto.RentalPackageSummaryResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.dto.RentalWorkflowOverviewResponse;
@@ -52,6 +53,10 @@ public class RentalWorkflowFacade {
                 .userRentalCount(userRentals.size())
                 .occupiedPeriods(occupiedDates.size())
                 .build();
+    }
+
+    public RentalPackageSummaryResponse getPremiumPackageSummary(double carPricePerDay, int days) {
+        return rentalService.getPremiumPackageSummary(carPricePerDay, days);
     }
 }
 // Koniec, Tydzień 4, Wzorzec Facade 3

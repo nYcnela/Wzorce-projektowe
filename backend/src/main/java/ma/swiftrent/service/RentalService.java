@@ -3,6 +3,7 @@ package ma.swiftrent.service;
 import lombok.RequiredArgsConstructor;
 import ma.swiftrent.composite.rentalPackage.RentalPackage;
 import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
+import ma.swiftrent.dto.RentalPackageSummaryResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
@@ -19,6 +20,9 @@ import ma.swiftrent.pattern.state.car.CarAvailabilityStateContext;
 import ma.swiftrent.pattern.state.rental.RentalStateContext;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalDescriptionVisitor;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalItemCountVisitor;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalPriceVisitor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
@@ -61,33 +65,21 @@ public class RentalService {
     // Tydzień 3, Wzorzec Factory Method 2 – użycie RentalResponseFactory (ConcreteCreator)
     private final RentalResponseFactory rentalResponseFactory = new RentalResponseFactory();
 
-    /**
-     * Tworzy nowe wypożyczenie samochodu.
-     *
-     * @param request Dane wypożyczenia
-     * @return Utworzone wypożyczenie
-     * @throws RuntimeException gdy walidacja nie powiedzie się
-     */
     @Transactional
     public RentalResponse createRental(RentalRequest request) {
-        // Pobiera aktualnie zalogowanego użytkownika
         String userEmail = securityContextAccessor.getCurrentUserEmail();
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
-        // Walidacja dat
         validateDates(request.getStartDate(), request.getEndDate());
 
-        // Znajduje samochód
         Car car = carRepository.findById(request.getCarId())
                 .orElseThrow(() -> new RuntimeException("Samochód o ID " + request.getCarId() + " nie został znaleziony"));
 
-        // Sprawdza kolizje rezerwacji
         if (rentalRepository.existsOverlappingRental(car.getId(), request.getStartDate(), request.getEndDate())) {
             throw new RuntimeException("Samochód jest już zarezerwowany w podanym terminie");
         }
 
-        // Oblicza całkowity koszt
         RentalPrice price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
         if (request.getInsuranceSelected()) {
             price = new InsuranceDecorator(price);
@@ -100,9 +92,7 @@ public class RentalService {
         BigDecimal totalCost = rentalPricingStrategyContext
                 .resolve(user, request.getStartDate(), request.getEndDate())
                 .calculate(baseCost);
-//        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
 
-        // Tworzy wypożyczenie
         Rental rental = Rental.builder()
                 .user(user)
                 .car(car)
@@ -112,7 +102,6 @@ public class RentalService {
                 .active()
                 .build();
 
-        // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
             // Tydzień 6, Wzorzec State 2 – stan auta decyduje o zmianie dostępności
             carAvailabilityStateContext.resolve(car).markUnavailable(car);
@@ -129,11 +118,6 @@ public class RentalService {
         return rentalResponseFactory.create(savedRental);
     }
 
-    /**
-     * Zwraca wypożyczony samochód (zakończenie wypożyczenia).
-     *
-     * @param id ID wypożyczenia
-     */
     @Transactional
     public void returnRental(Long id) {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
@@ -158,11 +142,6 @@ public class RentalService {
         ));
     }
 
-    /**
-     * Anuluje rezerwację (tylko jeśli jeszcze się nie rozpoczęła).
-     *
-     * @param id ID wypożyczenia
-     */
     @Transactional
     public void cancelRental(Long id) {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
@@ -186,11 +165,6 @@ public class RentalService {
         ));
     }
 
-    /**
-     * Pobiera wszystkie wypożyczenia zalogowanego użytkownika.
-     *
-     * @return Lista wypożyczeń użytkownika
-     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getUserRentals() {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
@@ -200,19 +174,11 @@ public class RentalService {
         return rentalResponseFactory.createAll(rentalRepository.findByUserId(user.getId()));
     }
 
-    /**
-     * Pobiera wszystkie wypożyczenia (ADMIN).
-     *
-     * @return Lista wszystkich wypożyczeń
-     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getAllRentals() {
         return rentalResponseFactory.createAll(rentalRepository.findAll());
     }
 
-    /**
-     * Pobiera listy zajętych dat dla konkretnego samochodu.
-     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getOccupiedDates(Long carId) {
         return rentalRepository.findAll().stream()
@@ -222,28 +188,43 @@ public class RentalService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Walidacja dat wypożyczenia.
-     *
-     * @param startDate Data rozpoczęcia
-     * @param endDate Data zakończenia
-     * @throws RuntimeException gdy daty są nieprawidłowe
-     */
+    @Transactional(readOnly = true)
+    public RentalPackageSummaryResponse getPremiumPackageSummary(double carPricePerDay, int days) {
+        RentalPackage premiumPackage = createPremiumPackage(carPricePerDay, days);
+
+        // Tydzień 6, Wzorzec Visitor 1 – użycie RentalPriceVisitor (ConcreteVisitor)
+        RentalPriceVisitor priceVisitor = new RentalPriceVisitor();
+        premiumPackage.accept(priceVisitor);
+
+        // Tydzień 6, Wzorzec Visitor 2 – użycie RentalDescriptionVisitor (ConcreteVisitor)
+        RentalDescriptionVisitor descriptionVisitor = new RentalDescriptionVisitor();
+        premiumPackage.accept(descriptionVisitor);
+
+        // Tydzień 6, Wzorzec Visitor 3 – użycie RentalItemCountVisitor (ConcreteVisitor)
+        RentalItemCountVisitor countVisitor = new RentalItemCountVisitor();
+        premiumPackage.accept(countVisitor);
+
+        return RentalPackageSummaryResponse.builder()
+                .packageName(premiumPackage.getName())
+                .totalPrice(priceVisitor.getTotalPrice())
+                .description(descriptionVisitor.getDescription())
+                .packageCount(countVisitor.getPackageCount())
+                .serviceItemCount(countVisitor.getServiceItemCount())
+                .build();
+    }
+
     private void validateDates(LocalDate startDate, LocalDate endDate) {
         LocalDate today = applicationClock.today();
         LocalDate maxDate = today.plusMonths(1);
 
-        // Data rozpoczęcia nie może być w przeszłości (ale dzisiaj jest OK)
         if (startDate.isBefore(today)) {
             throw new RuntimeException("Data rozpoczęcia nie może być w przeszłości");
         }
 
-        // Nie można rezerwować dalej niż na miesiąc w przód
         if (startDate.isAfter(maxDate)) {
             throw new RuntimeException("Można rezerwować tylko do miesiąca w przód (max: " + maxDate + ")");
         }
 
-        // Data zakończenia musi być po dacie rozpoczęcia
         if (endDate.isBefore(startDate) || endDate.isEqual(startDate)) {
             throw new RuntimeException("Data zakończenia musi być po dacie rozpoczęcia");
         }
@@ -253,23 +234,11 @@ public class RentalService {
         }
     }
 
-    /**
-     * Oblicza całkowity koszt wypożyczenia.
-     *
-     * @param pricePerDay Cena za dzień
-     * @param startDate Data rozpoczęcia
-     * @param endDate Data zakończenia
-     * @return Całkowity koszt wypożyczenia
-     */
     private BigDecimal calculateTotalCost(BigDecimal pricePerDay, LocalDate startDate, LocalDate endDate) {
-        // Liczenie dni włącznie: z 8/01 na 9/01 = 2 dni (8/01 + 9/01)
         long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
         return pricePerDay.multiply(BigDecimal.valueOf(days));
     }
 
-    /**
-     * Duplikuje wypożyczenie wykorzystując do tego wzorzec prototypu
-     */
     @Transactional
     public RentalResponse duplicateRental(Long id) {
 
