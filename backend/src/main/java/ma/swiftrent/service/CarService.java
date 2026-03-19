@@ -6,6 +6,8 @@ import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.pattern.factory.CarResponseFactory;
 import ma.swiftrent.pattern.factory.CarSortFactory;
+import ma.swiftrent.pattern.state.car.CarAvailabilityState;
+import ma.swiftrent.pattern.state.car.CarAvailabilityStateContext;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.service.logger.AppLogger;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,16 +32,22 @@ public class CarService implements CarOperationsService {
     private final RentalRepository rentalRepository;
     private final FileStorageService fileStorageService;
     private final AppLogger logger = new LoggerInheritanceAdapter();
+    // Tydzień 6, Wzorzec State 2 – użycie CarAvailabilityStateContext (Context)
+    private final CarAvailabilityStateContext carAvailabilityStateContext = new CarAvailabilityStateContext();
 
     // Tydzień 3, Wzorzec Factory Method 1 – użycie CarResponseFactory (ConcreteCreator)
     private final CarResponseFactory carResponseFactory = new CarResponseFactory();
 
     private CarResponse mapToResponse(Car car) {
         CarResponse response = carResponseFactory.create(car);
-        if (car.getStatus() != Car.CarStatus.AVAILABLE) {
-            java.time.LocalDate latestEnd = rentalRepository.findLatestEndDate(car.getId());
-            if (latestEnd != null) {
-                response.setAvailableFrom(latestEnd.plusDays(1));
+        // Tydzień 6, Wzorzec State 2 – kontekst wybiera stan dostępności auta
+        CarAvailabilityState availabilityState = carAvailabilityStateContext.resolve(car);
+        if (!availabilityState.isAvailable()) {
+            LocalDate availableFrom = availabilityState.resolveAvailableFrom(
+                    rentalRepository.findLatestEndDate(car.getId())
+            );
+            if (availableFrom != null) {
+                response.setAvailableFrom(availableFrom);
             }
         }
         return response;

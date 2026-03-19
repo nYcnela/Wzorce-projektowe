@@ -8,13 +8,13 @@ import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
-import ma.swiftrent.pattern.factory.CancelRentalActionFactory;
 import ma.swiftrent.pattern.factory.RentalResponseFactory;
-import ma.swiftrent.pattern.factory.ReturnRentalActionFactory;
 import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedEvent;
 import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedSubject;
 import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedEvent;
 import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedSubject;
+import ma.swiftrent.pattern.state.car.CarAvailabilityStateContext;
+import ma.swiftrent.pattern.state.rental.RentalStateContext;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
@@ -47,6 +47,10 @@ public class RentalService {
     private final RentalStatusChangedSubject rentalStatusChangedSubject;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
+    // Tydzień 6, Wzorzec State 1 – użycie RentalStateContext (Context)
+    private final RentalStateContext rentalStateContext = new RentalStateContext();
+    // Tydzień 6, Wzorzec State 2 – użycie CarAvailabilityStateContext (Context)
+    private final CarAvailabilityStateContext carAvailabilityStateContext = new CarAvailabilityStateContext();
 
     // Tydzień 3, Wzorzec Factory Method 2 – użycie RentalResponseFactory (ConcreteCreator)
     private final RentalResponseFactory rentalResponseFactory = new RentalResponseFactory();
@@ -100,7 +104,8 @@ public class RentalService {
 
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
-            car.setStatus(Car.CarStatus.UNAVAILABLE);
+            // Tydzień 6, Wzorzec State 2 – stan auta decyduje o zmianie dostępności
+            carAvailabilityStateContext.resolve(car).markUnavailable(car);
             carRepository.save(car);
         }
 
@@ -133,12 +138,8 @@ public class RentalService {
             throw new RuntimeException("Nie masz uprawnień do zwrotu tego wypożyczenia");
         }
 
-        if (rental.getStatus() != Rental.RentalStatus.ACTIVE) {
-            throw new RuntimeException("Wypożyczenie nie jest aktywne");
-        }
-
-        // Tydzień 3, Wzorzec Factory Method 3 – fabryka tworzy i wykonuje akcję zwrotu
-        new ReturnRentalActionFactory(applicationClock).process(rental);
+        // Tydzień 6, Wzorzec State 1 – delegacja operacji do obiektu stanu
+        rentalStateContext.resolve(rental).returnRental(rental, applicationClock);
         carRepository.save(rental.getCar());
         rentalRepository.save(rental);
         rentalStatusChangedSubject.notifyObservers(new RentalStatusChangedEvent(
@@ -169,19 +170,8 @@ public class RentalService {
             throw new RuntimeException("Nie masz uprawnień do anulowania tego wypożyczenia");
         }
 
-        if (rental.getStatus() != Rental.RentalStatus.ACTIVE) {
-            throw new RuntimeException("Tylko aktywne rezerwacje można anulować");
-        }
-
-        LocalDate today = applicationClock.today();
-        
-        // Można anulować tylko rezerwacje, które jeszcze się nie rozpoczęły
-        if (!rental.getStartDate().isAfter(today)) {
-            throw new RuntimeException("Nie można anulować wypożyczenia, które już się rozpoczęło. Użyj opcji zwrotu.");
-        }
-
-        // Tydzień 3, Wzorzec Factory Method 3 – fabryka tworzy i wykonuje akcję anulowania
-        new CancelRentalActionFactory().process(rental);
+        // Tydzień 6, Wzorzec State 1 – delegacja operacji do obiektu stanu
+        rentalStateContext.resolve(rental).cancelRental(rental, applicationClock);
         rentalRepository.save(rental);
         rentalStatusChangedSubject.notifyObservers(new RentalStatusChangedEvent(
                 rental.getId(),
@@ -223,7 +213,7 @@ public class RentalService {
     public List<RentalResponse> getOccupiedDates(Long carId) {
         return rentalRepository.findAll().stream()
                 .filter(r -> r.getCar().getId().equals(carId))
-                .filter(r -> r.getStatus() != Rental.RentalStatus.CANCELLED && r.getStatus() != Rental.RentalStatus.COMPLETED)
+                .filter(r -> rentalStateContext.resolve(r).blocksAvailability())
                 .map(rentalResponseFactory::create)
                 .collect(Collectors.toList());
     }

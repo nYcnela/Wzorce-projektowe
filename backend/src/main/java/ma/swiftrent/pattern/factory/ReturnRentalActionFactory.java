@@ -1,7 +1,7 @@
 package ma.swiftrent.pattern.factory;
 
-import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
+import ma.swiftrent.pattern.state.car.CarAvailabilityStateContext;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 
 import java.math.BigDecimal;
@@ -51,7 +51,8 @@ public class ReturnRentalActionFactory extends RentalStatusActionFactory {
 
             rental.setTotalCost(actualCost);
             rental.setStatus(Rental.RentalStatus.COMPLETED);
-            rental.getCar().setStatus(Car.CarStatus.AVAILABLE);
+            // Tydzień 6, Wzorzec State 2 – stan auta przejmuje logikę przywrócenia dostępności
+            new CarAvailabilityStateContext().resolve(rental.getCar()).markAvailable(rental.getCar());
         }
     }
 }

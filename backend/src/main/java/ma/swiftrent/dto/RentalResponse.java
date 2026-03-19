@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import ma.swiftrent.entity.Rental;
+import ma.swiftrent.pattern.singleton.ApplicationClock;
+import ma.swiftrent.pattern.state.rentaltimeline.RentalTimelineState;
+import ma.swiftrent.pattern.state.rentaltimeline.RentalTimelineStateContext;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,11 +31,18 @@ public class RentalResponse {
     private LocalDate endDate;
     private BigDecimal totalCost;
     private String status;
+    private String timelineState;
+    private boolean cancellableToday;
+    private boolean ongoing;
 
     /**
      * Konwertuje encję Rental na RentalResponse.
      */
     public static RentalResponse fromEntity(Rental rental) {
+        // Tydzień 6, Wzorzec State 3 – użycie RentalTimelineStateContext (Context)
+        RentalTimelineState timelineState = new RentalTimelineStateContext()
+                .resolve(rental, ApplicationClock.getInstance());
+
         return RentalResponse.builder()
                 .id(rental.getId())
                 .userId(rental.getUser() != null ? rental.getUser().getId() : null)
@@ -44,6 +54,9 @@ public class RentalResponse {
                 .endDate(rental.getEndDate())
                 .totalCost(rental.getTotalCost())
                 .status(rental.getStatus().name())
+                .timelineState(timelineState.getLabel())
+                .cancellableToday(timelineState.canBeCancelledToday())
+                .ongoing(timelineState.isOngoing())
                 .build();
     }
 }
