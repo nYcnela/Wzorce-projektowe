@@ -1,19 +1,24 @@
 package ma.swiftrent.pattern.observer.favorite;
 
+import ma.swiftrent.pattern.template.favorite.FavoriteChangedObserverTemplate;
 import ma.swiftrent.service.notification.BasicNotificationService;
 import ma.swiftrent.service.notification.NotificationService;
 import ma.swiftrent.service.notification.SmsNotificationDecorator;
 import org.springframework.stereotype.Component;
 
-// Konkretny observer wysyla powiadomienie
-// po zmianie ulubionych.
+// Tydzień 6, Wzorzec Template 3 – użycie FavoriteChangedObserverTemplate (AbstractClass)
 @Component
-public class FavoriteChangedNotificationObserver implements FavoriteChangedObserver {
+public class FavoriteChangedNotificationObserver extends FavoriteChangedObserverTemplate {
 
     @Override
-    public void onFavoriteChanged(FavoriteChangedEvent event) {
-        NotificationService notificationService = new SmsNotificationDecorator(new BasicNotificationService());
+    protected String createMessage(FavoriteChangedEvent event) {
         String action = event.added() ? "dodano do" : "usunieto z";
-        notificationService.send("Observer: auto " + event.carId() + " " + action + " ulubionych");
+        return "Observer: auto " + event.carId() + " " + action + " ulubionych";
+    }
+
+    @Override
+    protected void handleMessage(String message) {
+        NotificationService notificationService = new SmsNotificationDecorator(new BasicNotificationService());
+        notificationService.send(message);
     }
 }
