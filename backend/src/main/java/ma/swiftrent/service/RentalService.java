@@ -11,6 +11,9 @@ import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
 import ma.swiftrent.pattern.bridge.notification.*;
+import ma.swiftrent.pattern.bridge.report.CsvFormatter;
+import ma.swiftrent.pattern.bridge.report.RentalReport;
+import ma.swiftrent.pattern.bridge.report.Report;
 import ma.swiftrent.pattern.bridge.storage.*;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
@@ -227,9 +230,15 @@ public class RentalService {
      */
     @Transactional(readOnly = true)
     public List<RentalResponse> getAllRentals() {
-        return rentalRepository.findAll().stream()
+        List<RentalResponse> rentals = rentalRepository.findAll().stream()
                 .map(RentalResponse::fromEntity)
                 .collect(Collectors.toList());
+
+        Report report = new RentalReport(rentals, new CsvFormatter());
+        String result = report.generate();
+        System.out.println(result);
+
+        return rentals;
     }
 
     /**

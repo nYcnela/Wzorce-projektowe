@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
+import ma.swiftrent.pattern.bridge.report.CarReport;
+import ma.swiftrent.pattern.bridge.report.JsonFormatter;
+import ma.swiftrent.pattern.bridge.report.Report;
 import ma.swiftrent.pattern.bridge.storage.FileStorage;
 import ma.swiftrent.pattern.bridge.storage.ImageStorage;
 import ma.swiftrent.pattern.bridge.storage.LocalStorageImplementor;
@@ -73,6 +76,10 @@ public class CarService implements CarOperationsService {
                     break;
             }
         }
+
+        Report report = new CarReport(cars, new JsonFormatter());
+        String result = report.generate();
+        System.out.println(result);
 
         return cars;
     }
