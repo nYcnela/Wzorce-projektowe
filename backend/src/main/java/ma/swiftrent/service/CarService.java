@@ -4,6 +4,10 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
+import ma.swiftrent.pattern.bridge.storage.FileStorage;
+import ma.swiftrent.pattern.bridge.storage.ImageStorage;
+import ma.swiftrent.pattern.bridge.storage.LocalStorageImplementor;
+import ma.swiftrent.pattern.bridge.storage.StorageImplementor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.service.logger.AppLogger;
@@ -176,6 +180,15 @@ public class CarService implements CarOperationsService {
         } else {
             storage = new LocalFileStorageService();
         }
+
+        return storage.store(file);
+    }
+
+    public String storeFile(MultipartFile file) {
+
+        StorageImplementor implementor = new LocalStorageImplementor(new LocalFileStorageService());
+
+        FileStorage storage = new ImageStorage(implementor);
 
         return storage.store(file);
     }

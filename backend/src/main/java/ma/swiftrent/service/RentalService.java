@@ -11,6 +11,7 @@ import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
 import ma.swiftrent.pattern.bridge.notification.*;
+import ma.swiftrent.pattern.bridge.storage.*;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
@@ -27,8 +28,12 @@ import ma.swiftrent.service.price.BasicRentalPrice;
 import ma.swiftrent.service.price.GpsDecorator;
 import ma.swiftrent.service.price.InsuranceDecorator;
 import ma.swiftrent.service.price.RentalPrice;
+import ma.swiftrent.service.storage.JsonStorageAdapter;
+import ma.swiftrent.service.storage.JsonStorageSystem;
+import ma.swiftrent.service.storage.LocalFileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -325,5 +330,18 @@ public class RentalService {
 
         Notification userNotification = new UserNotification(new SmsSender());
         userNotification.send("Dodano wypożyczenie na twoje konto.");
+    }
+
+    public String storeFile(MultipartFile file) {
+
+        StorageImplementor implementor = new JsonStorageImplementor(
+                new JsonStorageAdapter(
+                        new JsonStorageSystem()
+                )
+        );
+
+        FileStorage storage = new DocumentStorage(implementor);
+
+        return storage.store(file);
     }
 }
