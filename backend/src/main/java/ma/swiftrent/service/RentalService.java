@@ -13,6 +13,8 @@ import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedEvent;
 import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedSubject;
 import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedEvent;
 import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedSubject;
+import ma.swiftrent.pattern.strategy.access.RentalAccessStrategyContext;
+import ma.swiftrent.pattern.strategy.pricing.RentalPricingStrategyContext;
 import ma.swiftrent.pattern.state.car.CarAvailabilityStateContext;
 import ma.swiftrent.pattern.state.rental.RentalStateContext;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
@@ -46,6 +48,10 @@ public class RentalService {
     private final RentalCreatedSubject rentalCreatedSubject;
     private final RentalStatusChangedSubject rentalStatusChangedSubject;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
+    // Tydzień 6, Wzorzec Strategy 1 – użycie RentalPricingStrategyContext (Context)
+    private final RentalPricingStrategyContext rentalPricingStrategyContext = new RentalPricingStrategyContext();
+    // Tydzień 6, Wzorzec Strategy 2 – użycie RentalAccessStrategyContext (Context)
+    private final RentalAccessStrategyContext rentalAccessStrategyContext = new RentalAccessStrategyContext();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
     // Tydzień 6, Wzorzec State 1 – użycie RentalStateContext (Context)
     private final RentalStateContext rentalStateContext = new RentalStateContext();
@@ -89,7 +95,11 @@ public class RentalService {
         if (request.getGpsSelected()) {
             price = new GpsDecorator(price);
         }
-        BigDecimal totalCost = price.calculateTotalCost();
+        BigDecimal baseCost = price.calculateTotalCost();
+        // Tydzień 6, Wzorzec Strategy 1 – wybór algorytmu naliczania końcowej ceny
+        BigDecimal totalCost = rentalPricingStrategyContext
+                .resolve(user, request.getStartDate(), request.getEndDate())
+                .calculate(baseCost);
 //        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
 
         // Tworzy wypożyczenie
@@ -131,12 +141,9 @@ public class RentalService {
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
         Rental.RentalStatus previousStatus = rental.getStatus();
 
-        // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
-
-        if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
-            throw new RuntimeException("Nie masz uprawnień do zwrotu tego wypożyczenia");
-        }
+        // Tydzień 6, Wzorzec Strategy 2 – strategia wybiera sposób weryfikacji dostępu
+        rentalAccessStrategyContext.resolve(isAdmin, rental, userEmail).validate(rental, userEmail);
 
         // Tydzień 6, Wzorzec State 1 – delegacja operacji do obiektu stanu
         rentalStateContext.resolve(rental).returnRental(rental, applicationClock);
@@ -163,12 +170,9 @@ public class RentalService {
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
         Rental.RentalStatus previousStatus = rental.getStatus();
 
-        // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
-
-        if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
-            throw new RuntimeException("Nie masz uprawnień do anulowania tego wypożyczenia");
-        }
+        // Tydzień 6, Wzorzec Strategy 2 – strategia wybiera sposób weryfikacji dostępu
+        rentalAccessStrategyContext.resolve(isAdmin, rental, userEmail).validate(rental, userEmail);
 
         // Tydzień 6, Wzorzec State 1 – delegacja operacji do obiektu stanu
         rentalStateContext.resolve(rental).cancelRental(rental, applicationClock);
