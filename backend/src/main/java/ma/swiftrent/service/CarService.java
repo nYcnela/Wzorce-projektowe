@@ -9,6 +9,9 @@ import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.service.logger.AppLogger;
 import ma.swiftrent.service.logger.LoggerInheritanceAdapter;
 import ma.swiftrent.service.storage.FileStorageService;
+import ma.swiftrent.service.storage.JsonStorageAdapter;
+import ma.swiftrent.service.storage.JsonStorageSystem;
+import ma.swiftrent.service.storage.LocalFileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -162,5 +165,18 @@ public class CarService implements CarOperationsService {
         Car saved = carRepository.save(copy);
 
         return mapToResponse(saved);
+    }
+
+    public String uploadCarFile(MultipartFile file, String type) {
+
+        FileStorageService storage;
+
+        if ("json".equalsIgnoreCase(type)) {
+            storage = new JsonStorageAdapter(new JsonStorageSystem());
+        } else {
+            storage = new LocalFileStorageService();
+        }
+
+        return storage.store(file);
     }
 }

@@ -10,6 +10,7 @@ import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.bridge.notification.*;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
 import ma.swiftrent.repository.CarRepository;
@@ -316,5 +317,13 @@ public class RentalService {
         premiumPackage.add(gps);
 
         return premiumPackage;
+    }
+
+    public void informUser(User user){
+        Notification rentalNotification = new RentalNotification(new EmailSender());
+        rentalNotification.send("Samochód został wypożyczony przez: " + user.getEmail());
+
+        Notification userNotification = new UserNotification(new SmsSender());
+        userNotification.send("Dodano wypożyczenie na twoje konto.");
     }
 }
