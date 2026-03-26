@@ -5,6 +5,7 @@ import ma.swiftrent.dto.CarRequest;
 import ma.swiftrent.dto.CarResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.pattern.bridge.report.CarReport;
+import ma.swiftrent.pattern.bridge.report.CarReportDataBuilder;
 import ma.swiftrent.pattern.bridge.report.JsonFormatter;
 import ma.swiftrent.pattern.bridge.report.Report;
 import ma.swiftrent.pattern.bridge.storage.FileStorage;
@@ -77,7 +78,7 @@ public class CarService implements CarOperationsService {
             }
         }
 
-        Report report = new CarReport(cars, new JsonFormatter());
+        Report report = new CarReport(cars, new JsonFormatter(), new CarReportDataBuilder());
         String result = report.generate();
         System.out.println(result);
 
