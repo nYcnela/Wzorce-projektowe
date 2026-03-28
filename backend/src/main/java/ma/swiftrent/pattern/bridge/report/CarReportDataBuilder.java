@@ -4,8 +4,9 @@ import ma.swiftrent.dto.CarResponse;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class CarReportDataBuilder {
+public class CarReportDataBuilder implements ReportDataBuilder<CarResponse> {
 
+    @Override
     public String build(List<CarResponse> cars) {
         return cars.stream()
                 .map(CarResponse::toString)
