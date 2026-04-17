@@ -38,6 +38,9 @@ import ma.swiftrent.service.logger.TimestampLoggerDecorator;
 import ma.swiftrent.service.notification.BasicNotificationService;
 import ma.swiftrent.service.notification.EmailNotificationDecorator;
 import ma.swiftrent.service.notification.NotificationService;
+import ma.swiftrent.pattern.bridge.report.CsvFormatter;
+import ma.swiftrent.pattern.bridge.report.RentalReport;
+import ma.swiftrent.pattern.bridge.report.Report;
 import ma.swiftrent.service.notification.SmsNotificationDecorator;
 import ma.swiftrent.service.price.BasicRentalPrice;
 import ma.swiftrent.service.price.GpsDecorator;
@@ -62,6 +65,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class RentalService {
+    AppLogger appLogger = new ConsoleLogger();
+    NotificationService notification = new BasicNotificationService();
+    private NotificationServiceFactory notificationServiceFactory = new NotificationServiceFactory();
+    NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
 
     private final RentalRepository rentalRepository;
     private final CarRepository carRepository;
@@ -228,15 +235,6 @@ public class RentalService {
      */
     @Transactional(readOnly = true)
     public List<RentalResponse> getAllRentals() {
-        List<RentalResponse> rentals = rentalRepository.findAll().stream()
-                .map(RentalResponse::fromEntity)
-                .collect(Collectors.toList());
-
-        Report report = new RentalReport(rentals, new CsvFormatter());
-        String result = report.generate();
-        System.out.println(result);
-
-        return rentals;
         return rentalResponseFactory.createAll(rentalRepository.findAll());
     }
 

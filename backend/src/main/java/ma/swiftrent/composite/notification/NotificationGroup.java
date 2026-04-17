@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /*
-    Tydzień 7, Zasad otwarte-zamknięte
+    Tydzień 7, Zasad otwarte-zamknięte 3
     NotificationGroup jest otwarte na rozbudowę w przyszłości -
     wystarczy stworzyć nowe klasy, które implementują NotificationComponent.
     Jest zamknięta na modyfikacje - nie trzeba wprowadzać żadnych zmian w
@@ -36,4 +36,4 @@ public class NotificationGroup implements NotificationComponent {
         }
     }
 }
-//Koniec Tydzień 7, Zasada otwarte-zamknięte
+//Koniec Tydzień 7, Zasada otwarte-zamknięte 3
