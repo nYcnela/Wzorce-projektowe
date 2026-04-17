@@ -1,5 +1,7 @@
 package ma.swiftrent.composite.rentalPackage;
 
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalItemVisitor;
+
 public class RentalServiceItem implements RentalItem {
 
     private final String name;
@@ -18,5 +20,10 @@ public class RentalServiceItem implements RentalItem {
     @Override
     public double getPrice() {
         return price;
+    }
+
+    @Override
+    public void accept(RentalItemVisitor visitor) {
+        visitor.visit(this);
     }
 }

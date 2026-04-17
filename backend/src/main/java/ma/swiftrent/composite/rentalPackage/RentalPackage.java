@@ -1,6 +1,7 @@
 package ma.swiftrent.composite.rentalPackage;
 
 import lombok.Getter;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalItemVisitor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,4 +36,9 @@ public class RentalPackage implements RentalItem {
                 .sum();
     }
 
+    @Override
+    public void accept(RentalItemVisitor visitor) {
+        visitor.visit(this);
+        items.forEach(item -> item.accept(visitor));
+    }
 }

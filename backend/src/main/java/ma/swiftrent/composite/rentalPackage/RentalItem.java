@@ -1,5 +1,7 @@
 package ma.swiftrent.composite.rentalPackage;
 
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalItemVisitor;
+
 /*
     Tydzień 3, Wzorzec Composite 3
     Zarówno pojedyńcza usługa jak i cały pakiet usług wypożyczeniowych
@@ -9,6 +11,7 @@ package ma.swiftrent.composite.rentalPackage;
 public interface RentalItem {
     String getName();
     double getPrice();
+    void accept(RentalItemVisitor visitor);
 
 }
 //Koniec Tydzień 3, Wzorzec Composite 3

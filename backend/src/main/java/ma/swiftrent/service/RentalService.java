@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import ma.swiftrent.composite.notification.NotificationComponent;
 import ma.swiftrent.composite.rentalPackage.RentalPackage;
 import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
-import ma.swiftrent.dto.CarResponse;
+import ma.swiftrent.dto.RentalPackageSummaryResponse;
 import ma.swiftrent.dto.RentalRequest;
 import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
@@ -15,8 +15,20 @@ import ma.swiftrent.pattern.bridge.report.CsvFormatter;
 import ma.swiftrent.pattern.bridge.report.RentalReport;
 import ma.swiftrent.pattern.bridge.report.Report;
 import ma.swiftrent.pattern.bridge.storage.*;
+import ma.swiftrent.pattern.factory.RentalResponseFactory;
+import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedEvent;
+import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedSubject;
+import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedEvent;
+import ma.swiftrent.pattern.observer.rentalstatus.RentalStatusChangedSubject;
+import ma.swiftrent.pattern.strategy.access.RentalAccessStrategyContext;
+import ma.swiftrent.pattern.strategy.pricing.RentalPricingStrategyContext;
+import ma.swiftrent.pattern.state.car.CarAvailabilityStateContext;
+import ma.swiftrent.pattern.state.rental.RentalStateContext;
 import ma.swiftrent.pattern.singleton.ApplicationClock;
 import ma.swiftrent.pattern.singleton.SecurityContextAccessor;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalDescriptionVisitor;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalItemCountVisitor;
+import ma.swiftrent.pattern.visitor.rentalpackage.RentalPriceVisitor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
@@ -54,21 +66,22 @@ public class RentalService {
     private final RentalRepository rentalRepository;
     private final CarRepository carRepository;
     private final UserRepository userRepository;
+    private final RentalCreatedSubject rentalCreatedSubject;
+    private final RentalStatusChangedSubject rentalStatusChangedSubject;
     private final ApplicationClock applicationClock = ApplicationClock.getInstance();
+    // Tydzień 6, Wzorzec Strategy 1 – użycie RentalPricingStrategyContext (Context)
+    private final RentalPricingStrategyContext rentalPricingStrategyContext = new RentalPricingStrategyContext();
+    // Tydzień 6, Wzorzec Strategy 2 – użycie RentalAccessStrategyContext (Context)
+    private final RentalAccessStrategyContext rentalAccessStrategyContext = new RentalAccessStrategyContext();
     private final SecurityContextAccessor securityContextAccessor = SecurityContextAccessor.getInstance();
-    RentalPrice price;
-    AppLogger appLogger = new ConsoleLogger();
-    NotificationService notification = new BasicNotificationService();
-    private NotificationServiceFactory notificationServiceFactory = new NotificationServiceFactory();
-    NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
+    // Tydzień 6, Wzorzec State 1 – użycie RentalStateContext (Context)
+    private final RentalStateContext rentalStateContext = new RentalStateContext();
+    // Tydzień 6, Wzorzec State 2 – użycie CarAvailabilityStateContext (Context)
+    private final CarAvailabilityStateContext carAvailabilityStateContext = new CarAvailabilityStateContext();
 
-    /**
-     * Tworzy nowe wypożyczenie samochodu.
-     *
-     * @param request Dane wypożyczenia
-     * @return Utworzone wypożyczenie
-     * @throws RuntimeException gdy walidacja nie powiedzie się
-     */
+    // Tydzień 3, Wzorzec Factory Method 2 – użycie RentalResponseFactory (ConcreteCreator)
+    private final RentalResponseFactory rentalResponseFactory = new RentalResponseFactory();
+
     @Transactional
     public RentalResponse createRental(RentalRequest request) {
         // Pobiera aktualnie zalogowanego użytkownika
@@ -88,16 +101,18 @@ public class RentalService {
             throw new RuntimeException("Samochód jest już zarezerwowany w podanym terminie");
         }
 
-        // Oblicza całkowity koszt
-        price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        RentalPrice price = new BasicRentalPrice(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
         if (request.getInsuranceSelected()) {
             price = new InsuranceDecorator(price);
         }
         if (request.getGpsSelected()) {
             price = new GpsDecorator(price);
         }
-        BigDecimal totalCost = price.calculateTotalCost();
-//        BigDecimal totalCost = calculateTotalCost(car.getPricePerDay(), request.getStartDate(), request.getEndDate());
+        BigDecimal baseCost = price.calculateTotalCost();
+        // Tydzień 6, Wzorzec Strategy 1 – wybór algorytmu naliczania końcowej ceny
+        BigDecimal totalCost = rentalPricingStrategyContext
+                .resolve(user, request.getStartDate(), request.getEndDate())
+                .calculate(baseCost);
 
         // Tworzy wypożyczenie
         Rental rental = Rental.builder()
@@ -118,12 +133,19 @@ public class RentalService {
 
         // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
-            car.setStatus(Car.CarStatus.UNAVAILABLE);
+            // Tydzień 6, Wzorzec State 2 – stan auta decyduje o zmianie dostępności
+            carAvailabilityStateContext.resolve(car).markUnavailable(car);
             carRepository.save(car);
         }
 
         Rental savedRental = rentalRepository.save(rental);
-        return RentalResponse.fromEntity(savedRental);
+        rentalCreatedSubject.notifyObservers(new RentalCreatedEvent(
+                savedRental.getId(),
+                car.getId(),
+                user.getEmail(),
+                savedRental.getTotalCost()
+        ));
+        return rentalResponseFactory.create(savedRental);
     }
 
     /**
@@ -136,40 +158,24 @@ public class RentalService {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
         Rental rental = rentalRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
+        Rental.RentalStatus previousStatus = rental.getStatus();
 
         // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
+        // Tydzień 6, Wzorzec Strategy 2 – strategia wybiera sposób weryfikacji dostępu
+        rentalAccessStrategyContext.resolve(isAdmin, rental, userEmail).validate(rental, userEmail);
 
-        if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
-            throw new RuntimeException("Nie masz uprawnień do zwrotu tego wypożyczenia");
-        }
-
-        if (rental.getStatus() != Rental.RentalStatus.ACTIVE) {
-            throw new RuntimeException("Wypożyczenie nie jest aktywne");
-        }
-
-        // Aktualizacja daty zakończenia na dzisiejszą (jeśli zwrócono wcześniej lub później)
-        LocalDate today = applicationClock.today();
-        rental.setEndDate(today);
-        
-        // Ponowne przeliczenie kosztu na podstawie faktycznego czasu trwania
-        // Jeśli anulowano przed rozpoczęciem (dzisiaj < startDate), koszt = 0
-        BigDecimal actualCost;
-        if (today.isBefore(rental.getStartDate())) {
-            actualCost = BigDecimal.ZERO;
-        } else {
-            actualCost = calculateTotalCost(rental.getCar().getPricePerDay(), rental.getStartDate(), today);
-        }
-        rental.setTotalCost(actualCost);
-
-        rental.setStatus(Rental.RentalStatus.COMPLETED);
-        
-        // "zwolnienie" samochodu
-        Car car = rental.getCar();
-        car.setStatus(Car.CarStatus.AVAILABLE);
-        carRepository.save(car);
-        
+        // Tydzień 6, Wzorzec State 1 – delegacja operacji do obiektu stanu
+        rentalStateContext.resolve(rental).returnRental(rental, applicationClock);
+        carRepository.save(rental.getCar());
         rentalRepository.save(rental);
+        rentalStatusChangedSubject.notifyObservers(new RentalStatusChangedEvent(
+                rental.getId(),
+                rental.getCar().getId(),
+                userEmail,
+                previousStatus,
+                rental.getStatus()
+        ));
     }
 
     /**
@@ -182,29 +188,23 @@ public class RentalService {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
         Rental rental = rentalRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
+        Rental.RentalStatus previousStatus = rental.getStatus();
 
         // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
+        // Tydzień 6, Wzorzec Strategy 2 – strategia wybiera sposób weryfikacji dostępu
+        rentalAccessStrategyContext.resolve(isAdmin, rental, userEmail).validate(rental, userEmail);
 
-        if (!isAdmin && !rental.getUser().getEmail().equals(userEmail)) {
-            throw new RuntimeException("Nie masz uprawnień do anulowania tego wypożyczenia");
-        }
-
-        if (rental.getStatus() != Rental.RentalStatus.ACTIVE) {
-            throw new RuntimeException("Tylko aktywne rezerwacje można anulować");
-        }
-
-        LocalDate today = applicationClock.today();
-        
-        // Można anulować tylko rezerwacje, które jeszcze się nie rozpoczęły
-        if (!rental.getStartDate().isAfter(today)) {
-            throw new RuntimeException("Nie można anulować wypożyczenia, które już się rozpoczęło. Użyj opcji zwrotu.");
-        }
-
-        // Anulowanie - bez opłaty
-        rental.setStatus(Rental.RentalStatus.CANCELLED);
-        rental.setTotalCost(BigDecimal.ZERO);
+        // Tydzień 6, Wzorzec State 1 – delegacja operacji do obiektu stanu
+        rentalStateContext.resolve(rental).cancelRental(rental, applicationClock);
         rentalRepository.save(rental);
+        rentalStatusChangedSubject.notifyObservers(new RentalStatusChangedEvent(
+                rental.getId(),
+                rental.getCar().getId(),
+                userEmail,
+                previousStatus,
+                rental.getStatus()
+        ));
     }
 
     /**
@@ -218,9 +218,7 @@ public class RentalService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
-        return rentalRepository.findByUserId(user.getId()).stream()
-                .map(RentalResponse::fromEntity)
-                .collect(Collectors.toList());
+        return rentalResponseFactory.createAll(rentalRepository.findByUserId(user.getId()));
     }
 
     /**
@@ -239,6 +237,7 @@ public class RentalService {
         System.out.println(result);
 
         return rentals;
+        return rentalResponseFactory.createAll(rentalRepository.findAll());
     }
 
     /**
@@ -248,18 +247,36 @@ public class RentalService {
     public List<RentalResponse> getOccupiedDates(Long carId) {
         return rentalRepository.findAll().stream()
                 .filter(r -> r.getCar().getId().equals(carId))
-                .filter(r -> r.getStatus() != Rental.RentalStatus.CANCELLED && r.getStatus() != Rental.RentalStatus.COMPLETED)
-                .map(RentalResponse::fromEntity)
+                .filter(r -> rentalStateContext.resolve(r).blocksAvailability())
+                .map(rentalResponseFactory::create)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Walidacja dat wypożyczenia.
-     *
-     * @param startDate Data rozpoczęcia
-     * @param endDate Data zakończenia
-     * @throws RuntimeException gdy daty są nieprawidłowe
-     */
+    @Transactional(readOnly = true)
+    public RentalPackageSummaryResponse getPremiumPackageSummary(double carPricePerDay, int days) {
+        RentalPackage premiumPackage = createPremiumPackage(carPricePerDay, days);
+
+        // Tydzień 6, Wzorzec Visitor 1 – użycie RentalPriceVisitor (ConcreteVisitor)
+        RentalPriceVisitor priceVisitor = new RentalPriceVisitor();
+        premiumPackage.accept(priceVisitor);
+
+        // Tydzień 6, Wzorzec Visitor 2 – użycie RentalDescriptionVisitor (ConcreteVisitor)
+        RentalDescriptionVisitor descriptionVisitor = new RentalDescriptionVisitor();
+        premiumPackage.accept(descriptionVisitor);
+
+        // Tydzień 6, Wzorzec Visitor 3 – użycie RentalItemCountVisitor (ConcreteVisitor)
+        RentalItemCountVisitor countVisitor = new RentalItemCountVisitor();
+        premiumPackage.accept(countVisitor);
+
+        return RentalPackageSummaryResponse.builder()
+                .packageName(premiumPackage.getName())
+                .totalPrice(priceVisitor.getTotalPrice())
+                .description(descriptionVisitor.getDescription())
+                .packageCount(countVisitor.getPackageCount())
+                .serviceItemCount(countVisitor.getServiceItemCount())
+                .build();
+    }
+
     private void validateDates(LocalDate startDate, LocalDate endDate) {
         LocalDate today = applicationClock.today();
         LocalDate maxDate = today.plusMonths(1);
