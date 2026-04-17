@@ -1,6 +1,7 @@
 package ma.swiftrent.service;
 
 import lombok.RequiredArgsConstructor;
+import ma.swiftrent.composite.notification.NotificationComponent;
 import ma.swiftrent.composite.rentalPackage.RentalPackage;
 import ma.swiftrent.composite.rentalPackage.RentalServiceItem;
 import ma.swiftrent.dto.RentalPackageSummaryResponse;
@@ -9,6 +10,11 @@ import ma.swiftrent.dto.RentalResponse;
 import ma.swiftrent.entity.Car;
 import ma.swiftrent.entity.Rental;
 import ma.swiftrent.entity.User;
+import ma.swiftrent.pattern.bridge.notification.*;
+import ma.swiftrent.pattern.bridge.report.CsvFormatter;
+import ma.swiftrent.pattern.bridge.report.RentalReport;
+import ma.swiftrent.pattern.bridge.report.Report;
+import ma.swiftrent.pattern.bridge.storage.*;
 import ma.swiftrent.pattern.factory.RentalResponseFactory;
 import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedEvent;
 import ma.swiftrent.pattern.observer.rentalcreated.RentalCreatedSubject;
@@ -26,12 +32,26 @@ import ma.swiftrent.pattern.visitor.rentalpackage.RentalPriceVisitor;
 import ma.swiftrent.repository.CarRepository;
 import ma.swiftrent.repository.RentalRepository;
 import ma.swiftrent.repository.UserRepository;
+import ma.swiftrent.service.logger.AppLogger;
+import ma.swiftrent.service.logger.ConsoleLogger;
+import ma.swiftrent.service.logger.TimestampLoggerDecorator;
+import ma.swiftrent.service.notification.BasicNotificationService;
+import ma.swiftrent.service.notification.EmailNotificationDecorator;
+import ma.swiftrent.service.notification.NotificationService;
+import ma.swiftrent.pattern.bridge.report.CsvFormatter;
+import ma.swiftrent.pattern.bridge.report.RentalReport;
+import ma.swiftrent.pattern.bridge.report.Report;
+import ma.swiftrent.service.notification.SmsNotificationDecorator;
 import ma.swiftrent.service.price.BasicRentalPrice;
 import ma.swiftrent.service.price.GpsDecorator;
 import ma.swiftrent.service.price.InsuranceDecorator;
 import ma.swiftrent.service.price.RentalPrice;
+import ma.swiftrent.service.storage.JsonStorageAdapter;
+import ma.swiftrent.service.storage.JsonStorageSystem;
+import ma.swiftrent.service.storage.LocalFileStorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -45,6 +65,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class RentalService {
+    AppLogger appLogger = new ConsoleLogger();
+    NotificationService notification = new BasicNotificationService();
+    private NotificationServiceFactory notificationServiceFactory = new NotificationServiceFactory();
+    NotificationComponent notification2 = notificationServiceFactory.createNotificationSystem();
 
     private final RentalRepository rentalRepository;
     private final CarRepository carRepository;
@@ -67,15 +91,19 @@ public class RentalService {
 
     @Transactional
     public RentalResponse createRental(RentalRequest request) {
+        // Pobiera aktualnie zalogowanego użytkownika
         String userEmail = securityContextAccessor.getCurrentUserEmail();
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
 
+        // Walidacja dat
         validateDates(request.getStartDate(), request.getEndDate());
 
+        // Znajduje samochód
         Car car = carRepository.findById(request.getCarId())
                 .orElseThrow(() -> new RuntimeException("Samochód o ID " + request.getCarId() + " nie został znaleziony"));
 
+        // Sprawdza kolizje rezerwacji
         if (rentalRepository.existsOverlappingRental(car.getId(), request.getStartDate(), request.getEndDate())) {
             throw new RuntimeException("Samochód jest już zarezerwowany w podanym terminie");
         }
@@ -93,6 +121,7 @@ public class RentalService {
                 .resolve(user, request.getStartDate(), request.getEndDate())
                 .calculate(baseCost);
 
+        // Tworzy wypożyczenie
         Rental rental = Rental.builder()
                 .user(user)
                 .car(car)
@@ -102,6 +131,14 @@ public class RentalService {
                 .active()
                 .build();
 
+        appLogger = new TimestampLoggerDecorator(appLogger);
+        appLogger.logInfo("Dokonano rezerwacji.");
+        notification = new EmailNotificationDecorator(notification);
+        notification = new SmsNotificationDecorator(notification);
+        notification.send("Zarejestrowano na twoim konice nowe wypożyczenie.");
+        notification2.send("Samochód został wypożyczony przez: " + user.getEmail());
+
+        // Zmienia status samochodu na zajęty TYLKO jeśli wypożyczenie zaczyna się dzisiaj
         if (request.getStartDate().isEqual(applicationClock.today())) {
             // Tydzień 6, Wzorzec State 2 – stan auta decyduje o zmianie dostępności
             carAvailabilityStateContext.resolve(car).markUnavailable(car);
@@ -118,6 +155,11 @@ public class RentalService {
         return rentalResponseFactory.create(savedRental);
     }
 
+    /**
+     * Zwraca wypożyczony samochód (zakończenie wypożyczenia).
+     *
+     * @param id ID wypożyczenia
+     */
     @Transactional
     public void returnRental(Long id) {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
@@ -125,6 +167,7 @@ public class RentalService {
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
         Rental.RentalStatus previousStatus = rental.getStatus();
 
+        // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
         // Tydzień 6, Wzorzec Strategy 2 – strategia wybiera sposób weryfikacji dostępu
         rentalAccessStrategyContext.resolve(isAdmin, rental, userEmail).validate(rental, userEmail);
@@ -142,6 +185,11 @@ public class RentalService {
         ));
     }
 
+    /**
+     * Anuluje rezerwację (tylko jeśli jeszcze się nie rozpoczęła).
+     *
+     * @param id ID wypożyczenia
+     */
     @Transactional
     public void cancelRental(Long id) {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
@@ -149,6 +197,7 @@ public class RentalService {
                 .orElseThrow(() -> new RuntimeException("Wypożyczenie nie znalezione"));
         Rental.RentalStatus previousStatus = rental.getStatus();
 
+        // Sprawdza czy użytkownik jest właścicielem (chyba że to admin)
         boolean isAdmin = securityContextAccessor.currentUserHasRole("ADMIN");
         // Tydzień 6, Wzorzec Strategy 2 – strategia wybiera sposób weryfikacji dostępu
         rentalAccessStrategyContext.resolve(isAdmin, rental, userEmail).validate(rental, userEmail);
@@ -165,6 +214,11 @@ public class RentalService {
         ));
     }
 
+    /**
+     * Pobiera wszystkie wypożyczenia zalogowanego użytkownika.
+     *
+     * @return Lista wypożyczeń użytkownika
+     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getUserRentals() {
         String userEmail = securityContextAccessor.getCurrentUserEmail();
@@ -174,11 +228,19 @@ public class RentalService {
         return rentalResponseFactory.createAll(rentalRepository.findByUserId(user.getId()));
     }
 
+    /**
+     * Pobiera wszystkie wypożyczenia (ADMIN).
+     *
+     * @return Lista wszystkich wypożyczeń
+     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getAllRentals() {
         return rentalResponseFactory.createAll(rentalRepository.findAll());
     }
 
+    /**
+     * Pobiera listy zajętych dat dla konkretnego samochodu.
+     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getOccupiedDates(Long carId) {
         return rentalRepository.findAll().stream()
@@ -217,14 +279,17 @@ public class RentalService {
         LocalDate today = applicationClock.today();
         LocalDate maxDate = today.plusMonths(1);
 
+        // Data rozpoczęcia nie może być w przeszłości (ale dzisiaj jest OK)
         if (startDate.isBefore(today)) {
             throw new RuntimeException("Data rozpoczęcia nie może być w przeszłości");
         }
 
+        // Nie można rezerwować dalej niż na miesiąc w przód
         if (startDate.isAfter(maxDate)) {
             throw new RuntimeException("Można rezerwować tylko do miesiąca w przód (max: " + maxDate + ")");
         }
 
+        // Data zakończenia musi być po dacie rozpoczęcia
         if (endDate.isBefore(startDate) || endDate.isEqual(startDate)) {
             throw new RuntimeException("Data zakończenia musi być po dacie rozpoczęcia");
         }
@@ -234,11 +299,23 @@ public class RentalService {
         }
     }
 
+    /**
+     * Oblicza całkowity koszt wypożyczenia.
+     *
+     * @param pricePerDay Cena za dzień
+     * @param startDate Data rozpoczęcia
+     * @param endDate Data zakończenia
+     * @return Całkowity koszt wypożyczenia
+     */
     private BigDecimal calculateTotalCost(BigDecimal pricePerDay, LocalDate startDate, LocalDate endDate) {
+        // Liczenie dni włącznie: z 8/01 na 9/01 = 2 dni (8/01 + 9/01)
         long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
         return pricePerDay.multiply(BigDecimal.valueOf(days));
     }
 
+    /**
+     * Duplikuje wypożyczenie wykorzystując do tego wzorzec prototypu
+     */
     @Transactional
     public RentalResponse duplicateRental(Long id) {
 
@@ -269,5 +346,26 @@ public class RentalService {
         premiumPackage.add(gps);
 
         return premiumPackage;
+    }
+
+    public void informUser(User user){
+        Notification rentalNotification = new RentalNotification(new EmailSender());
+        rentalNotification.send("Samochód został wypożyczony przez: " + user.getEmail());
+
+        Notification userNotification = new UserNotification(new SmsSender());
+        userNotification.send("Dodano wypożyczenie na twoje konto.");
+    }
+
+    public String storeFile(MultipartFile file) {
+
+        StorageImplementor implementor = new JsonStorageImplementor(
+                new JsonStorageAdapter(
+                        new JsonStorageSystem()
+                )
+        );
+
+        FileStorage storage = new DocumentStorage(implementor);
+
+        return storage.store(file);
     }
 }

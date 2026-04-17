@@ -3,6 +3,13 @@ package ma.swiftrent.composite.notification;
 import java.util.ArrayList;
 import java.util.List;
 
+/*
+    Tydzień 7, Zasad otwarte-zamknięte 3
+    NotificationGroup jest otwarte na rozbudowę w przyszłości -
+    wystarczy stworzyć nowe klasy, które implementują NotificationComponent.
+    Jest zamknięta na modyfikacje - nie trzeba wprowadzać żadnych zmian w
+    NotificationGroup, aby ta nowa klasa działała.
+ */
 public class NotificationGroup implements NotificationComponent {
 
     private final String name;
@@ -29,3 +36,4 @@ public class NotificationGroup implements NotificationComponent {
         }
     }
 }
+//Koniec Tydzień 7, Zasada otwarte-zamknięte 3

@@ -53,7 +53,7 @@ public class AuthService {
 //                .build();
         /*
         Tydzień 2, Wzorzec Prototype 2
-        Wykorzystanie schematu użytkwonika z rejetru prototypów
+        Wykorzystanie schematu użytkownika z rejestru prototypów
         do stworzenia nowego użytkownika podczas rejestracji
          */
         var user = UserPrototypeRegistry.getPrototype("user-template");
