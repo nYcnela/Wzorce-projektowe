@@ -12,7 +12,7 @@ public class LocalStorageImplementor implements StorageImplementor {
     }
 
     @Override
-    public String store(MultipartFile file) {
+    public String storeFile(MultipartFile file) {
         return localStorage.store(file);
     }
 }

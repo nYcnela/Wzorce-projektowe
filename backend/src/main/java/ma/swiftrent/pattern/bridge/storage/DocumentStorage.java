@@ -11,6 +11,6 @@ public class DocumentStorage extends FileStorage {
     @Override
     public String store(MultipartFile file) {
         System.out.println("📄 Zapisywanie dokumentu...");
-        return implementor.store(file);
+        return implementor.storeFile(file);
     }
 }
