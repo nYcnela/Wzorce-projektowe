@@ -5,7 +5,10 @@ import ma.swiftrent.pattern.visitor.rentalpackage.RentalItemVisitor;
 
 import java.util.ArrayList;
 import java.util.List;
-
+/*
+Tydzień 9, Nieduługie metody 2
+Żadna z metod w tej klasie nie przekracza 20 linii
+ */
 public class RentalPackage implements RentalItem {
 
     private final String name;
@@ -42,3 +45,4 @@ public class RentalPackage implements RentalItem {
         items.forEach(item -> item.accept(visitor));
     }
 }
+//Koniec, Tydzień 9, Niedługie metody 2

@@ -327,7 +327,12 @@ public class RentalService {
         Rental saved = rentalRepository.save(copy);
         return RentalResponse.fromEntity(saved);
     }
-
+/*
+Tydzień 9, Niedługie metody 1
+Te metoda nie przekracza 20 linii,
+jest blisko tej liczby, ale to tylko ze względu na spacje dla przejrzystości,
+zajmuje 19 linii
+ */
     public RentalPackage createPremiumPackage(double carPricePerDay, int days) {
 
         RentalServiceItem carRental =
@@ -347,7 +352,7 @@ public class RentalService {
 
         return premiumPackage;
     }
-
+//Koniec, Tydzień 9, Niedługie metody 1
     public void informUser(User user){
         Notification rentalNotification = new RentalNotification(new EmailSender());
         rentalNotification.send("Samochód został wypożyczony przez: " + user.getEmail());
