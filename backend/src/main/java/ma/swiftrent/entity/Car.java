@@ -168,12 +168,15 @@ public class Car implements Prototype<Car> {
         this.status = source.status;
         this.rentals = new ArrayList<>();
     }
-
+/*Tydzień 9, Jedna rola funkcji 1
+Ta funkcja spełnia tylko jedną rolę: stworzenie nowego obiektu Car na bazie istniejącego
+ */
     @Override
     public Car clone() {
         return new Car(this);
     }
     //Koniec, Tydzień 2, Wzorzec Prototype 1
+    //Koniec, Tydzień 9, Jedna rola funkcji 1
 }
 
 //Koniec, Tydzień 9, Niedługie metody 3
