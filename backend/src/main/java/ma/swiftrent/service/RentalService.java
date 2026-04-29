@@ -332,6 +332,9 @@ Tydzień 9, Niedługie metody 1
 Te metoda nie przekracza 20 linii,
 jest blisko tej liczby, ale to tylko ze względu na spacje dla przejrzystości,
 zajmuje 19 linii
+
+Tydzień 9, Max 3 argumenty 2
+Ta funkcja posiada tylko 2 argumenty
  */
     public RentalPackage createPremiumPackage(double carPricePerDay, int days) {
 
@@ -353,6 +356,7 @@ zajmuje 19 linii
         return premiumPackage;
     }
 //Koniec, Tydzień 9, Niedługie metody 1
+//Koniec, Tydzień 9, Max 3 argumenty 2
     public void informUser(User user){
         Notification rentalNotification = new RentalNotification(new EmailSender());
         rentalNotification.send("Samochód został wypożyczony przez: " + user.getEmail());

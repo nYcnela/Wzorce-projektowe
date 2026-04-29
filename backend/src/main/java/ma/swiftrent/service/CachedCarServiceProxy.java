@@ -51,12 +51,17 @@ public class CachedCarServiceProxy implements CarOperationsService {
         return createdCar;
     }
 
+    /*
+    Tydzień 9, Max 3 argumenty 3
+    Ta funkcja posiada 3 parametry
+     */
     @Override
     public CarResponse updateCar(Long id, CarRequest request, MultipartFile image) {
         CarResponse updatedCar = carOperationsService.updateCar(id, request, image);
         clearCache();
         return updatedCar;
     }
+    //Koniec, Tydzień 9, Max 3 argumenty 3
 
     @Override
     public void deleteCar(Long id) {

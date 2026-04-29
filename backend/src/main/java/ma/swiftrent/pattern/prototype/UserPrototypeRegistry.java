@@ -15,11 +15,15 @@ public class UserPrototypeRegistry {
     /*
     Tydzień 9, Jedna rola funkcji 3
     Ta funkcja odpowiada tylko i wyłącznie za dodanie nowego prototypu użytkownika
+
+    Tydzień 9, Max 3 argumenty
+    Ta funkcja przyjmuje tylko 2 argumenty
      */
     public static void addPrototype(String key, User user) {
         prototypes.put(key, user);
     }
     //Koniec, Tydzień 9, Jedna rola funkcji 3
+    // Koniec, Tydzień 9, Max 3 argumenty
 
     public static User getPrototype(String key) {
         User prototype = prototypes.get(key);
