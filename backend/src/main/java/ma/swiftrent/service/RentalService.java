@@ -219,14 +219,49 @@ public class RentalService {
      *
      * @return Lista wypożyczeń użytkownika
      */
+    /*
+    Tydzień 9, Funkcje na tym samym poziomie abstrakcji 2
+    Funkcja getUserRentals() jest na wysokim poziomie abstrakcji: widzimy, że
+    aktualny user jest pobierany i jego wypożyczenia są zwracane.
+    Przechodzimy na niższy poziom i widzimy, że getCurrentUser() jest rozbite na dwie funkcje:
+    getCurrentUserEmail() i getUserByEmail(), które z kolei zawierają szczegóły tego jak te operacje
+    zostaną wykonane, czyli niski poziom abstrakcji.
+    Podobne zjawisko zachodzi dla getRentalResponsesForUser()
+     */
     @Transactional(readOnly = true)
     public List<RentalResponse> getUserRentals() {
-        String userEmail = securityContextAccessor.getCurrentUserEmail();
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
+        User user = getCurrentUser();
 
-        return rentalResponseFactory.createAll(rentalRepository.findByUserId(user.getId()));
+        return getRentalResponsesForUser(user);
     }
+
+    private User getCurrentUser(){
+        String userEmail = getCurrentUsersEmail();
+        return getUserByEmail(userEmail);
+    }
+
+    private String getCurrentUsersEmail() {
+        return securityContextAccessor.getCurrentUserEmail();
+    }
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
+    }
+
+    private List<RentalResponse> getRentalResponsesForUser(User user) {
+        List<Rental> rentals = getRentalsForUser(user);
+        return createRentalResponses(rentals);
+    }
+
+    private List<Rental> getRentalsForUser(User user) {
+        return rentalRepository.findByUserId(user.getId());
+    }
+
+    private List<RentalResponse> createRentalResponses(List<Rental> rentals) {
+        return rentalResponseFactory.createAll(rentals);
+    }
+    //Koniec, Tydzień 9, Funkcje na tym samym poziomie abstrakcji 2
 
     /**
      * Pobiera wszystkie wypożyczenia (ADMIN).
@@ -357,6 +392,7 @@ Ta funkcja posiada tylko 2 argumenty
     }
 //Koniec, Tydzień 9, Niedługie metody 1
 //Koniec, Tydzień 9, Max 3 argumenty 2
+
     public void informUser(User user){
         Notification rentalNotification = new RentalNotification(new EmailSender());
         rentalNotification.send("Samochód został wypożyczony przez: " + user.getEmail());
