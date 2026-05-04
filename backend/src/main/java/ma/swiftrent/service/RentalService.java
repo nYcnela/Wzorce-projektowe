@@ -244,10 +244,22 @@ public class RentalService {
         return securityContextAccessor.getCurrentUserEmail();
     }
 
+    /*
+    Tydzień 9, Zwracanie wyjątku zamiast kodu błędu 1
+    Zwracamy customowy wyjątek UserNotFoundException() w razie jeżeli
+    wyszukiwanie po emailu nie przyniosło rezultatów
+     */
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Użytkownik nie został znaleziony"));
+                .orElseThrow(() -> new UserNotFoundException(email));
     }
+
+    public static class UserNotFoundException extends RuntimeException {
+        public UserNotFoundException(String email) {
+            super("Użytkownik nie został znaleziony dla email: " + email);
+        }
+    }
+    //Koniec, Tydzień 9, Zwracanie wyjątku zamiast kodu błędu
 
     private List<RentalResponse> getRentalResponsesForUser(User user) {
         List<Rental> rentals = getRentalsForUser(user);

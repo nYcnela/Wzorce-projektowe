@@ -15,6 +15,11 @@ public final class UploadStorageSettings {
     private static final String DEFAULT_PUBLIC_BASE_URL = "http://localhost:8080/uploads/";
     private static final UploadStorageSettings INSTANCE;
 
+    /*
+     Tydzień 9, Zwracanie wyjątku zamiast kodu błędu
+     W tym przypadku wyjątek jest zwracany w strukturze try-catch
+     */
+
     static {
         try {
             INSTANCE = new UploadStorageSettings(DEFAULT_UPLOAD_DIRECTORY, DEFAULT_PUBLIC_BASE_URL);
@@ -22,6 +27,7 @@ public final class UploadStorageSettings {
             throw new IllegalStateException("Nie można zainicjalizować konfiguracji uploadów.", exception);
         }
     }
+    //Koniec, Tydzień 9, Zwracanie wyjątku zamiast kodu błędu
 
     private final Path storageDirectory;
     private final String publicBaseUrl;

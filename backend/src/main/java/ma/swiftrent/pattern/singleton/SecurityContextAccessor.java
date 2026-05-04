@@ -30,6 +30,10 @@ public final class SecurityContextAccessor {
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + roleName));
     }
 
+    /*
+    Tydzień 9, Zwracanie wyjątku zamiast kodu błędu 2
+    W tym przypadku zwracany jest wyjątek jako RuntimeException
+     */
     private Authentication getAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null) {
@@ -37,5 +41,6 @@ public final class SecurityContextAccessor {
         }
         return authentication;
     }
+    //Koniec, Tydzień 9, Zwracanie wyjątku zamiast kodu błedu 2
 }
 // Koniec, Tydzień 2, Wzorzec Singleton 3
