@@ -22,6 +22,12 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+/*
+Tydzień 9, Jasne i zrozumiałe nazwy 1
+Nazwa "User" jednoznacznie oznacza użytkownika aplikacji,
+nazwy "email, password, role" jednoznacznie oznaczają co te pola reprezentują,
+podobnie jak nazwy metod
+ */
 public class User implements UserDetails, Prototype<User> {
 
     @Id
@@ -37,7 +43,7 @@ public class User implements UserDetails, Prototype<User> {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
-
+//Koniec, Tydzień 9, Jasne i zrozumiałe nazwy 1
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<Rental> rentals;
 

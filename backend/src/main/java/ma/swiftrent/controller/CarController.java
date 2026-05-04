@@ -34,12 +34,17 @@ public class CarController {
      * @param sortBy Opcjonalny parametr sortowania: price-asc, price-desc
      * @return Lista wszystkich samochodów
      */
+    /*
+    Tydzień 9, Jedna rola funkcji 2
+    Ta funkcja odpowiada tylko za obsługę endpointu pobierającego wszystkie samochody
+     */
     @GetMapping
     public ResponseEntity<List<CarResponse>> getAllCars(
             @RequestParam(required = false) String sortBy
     ) {
         return ResponseEntity.ok(catalogFacade.getPublicCatalog(sortBy));
     }
+    //Koniec, Tydzień 9, Jedna rola funkcji 2
 
     /**
      * Endpoint pobierający samochód po ID (dostępny publicznie).

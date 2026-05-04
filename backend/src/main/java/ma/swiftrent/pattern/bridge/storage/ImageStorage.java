@@ -11,6 +11,6 @@ public class ImageStorage extends FileStorage {
     @Override
     public String store(MultipartFile file) {
         System.out.println("📷 Zapisywanie obrazu...");
-        return implementor.store(file);
+        return implementor.storeFile(file);
     }
 }

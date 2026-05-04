@@ -70,23 +70,47 @@ public class CarService implements CarOperationsService {
      * @param sortBy Opcjonalny parametr sortowania: price-asc, price-desc
      * @return Lista samochodów posortowana według wybranego kryterium
      */
+    /*
+    Tydzień 9, Funkcje na jednym poziomie abstrakcji 1
+    getAllCars() wcześniej zawierała mieszaninę kodu, który teraz został przeniesiony na
+    zewnątrz do prywatnych funkcji loadCars(), sortCars() i generateCatalogReport(),
+    a więc getAllCars mówi CO robimy, wywołąnia funkcji w niej mówią na jakie czynności ta czynność
+    jest rozbita i wreszcie te pojedyńcze funkcje są tym JAK dokładnie te czynnośći są robione,
+    a więc mamy poziomy abstrakcji top to bottom
+     */
     @Transactional(readOnly = true)
     @Override
     public List<CarResponse> getAllCars(String sortBy) {
-        //Pobiera wszystkie samochody i mapuje na dto
-        List<CarResponse> cars = carRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-
-        // Tydzień 3, Wzorzec Factory Method 2 – CarSortFactory tworzy odpowiedni komparator
-        cars.sort(CarSortFactory.forStrategy(sortBy).createComparator());
-
-        Report report = new CarReport(cars, new JsonFormatter(), new CarReportDataBuilder());
-        String result = report.generate();
-        System.out.println(result);
+        List<CarResponse> cars = loadCars();
+        sortCars(cars, sortBy);
+        generateCatalogReport(cars);
 
         return cars;
     }
+
+
+    private List<CarResponse> loadCars() {
+        return carRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private void sortCars(List<CarResponse> cars, String sortBy) {
+        // Tydzień 3, Wzorzec Factory Method 2 – CarSortFactory tworzy odpowiedni komparator
+        cars.sort(CarSortFactory.forStrategy(sortBy).createComparator());
+        //Koniec, Tydzień 3, Wzorzec Factory Method 2
+    }
+
+    private void generateCatalogReport(List<CarResponse> cars) {
+        Report report = new CarReport(
+                cars,
+                new JsonFormatter(),
+                new CarReportDataBuilder()
+        );
+
+        System.out.println(report.generate());
+    }
+    //Koniec, Tydzień 9, Funkcje na jednym poziomie abstrakcji 1
 
     /**
      * Pobiera samochód po ID.
